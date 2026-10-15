@@ -71,4 +71,64 @@ const validarRestablecerClave = (req, res, next) => {
     }
     next()
 }
-export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave}
+// hu002 recursos
+const CATEGORIAS_RECURSO = ['tecnico', 'academico', 'recreativo']
+const ESTADOS_RECURSO = ['disponible', 'prestado', 'mantenimiento']
+
+// valida los datos recibidos al registrar un recurso
+const validarRecurso = (req, res, next) => {
+    const {nombre, descripcion, categoria, estado, imagen} = req.body
+    if(!textoValido(nombre) || !textoValido(categoria)){
+        return res.status(400).json({msg: 'El nombre y la categoria son obligatorios'})
+    }
+    if(nombre.trim().length < 3){
+        return res.status(400).json({msg: 'El nombre debe tener al menos 3 caracteres'})
+    }
+    if(!CATEGORIAS_RECURSO.includes(categoria)){
+        return res.status(400).json({msg: `La categoria debe ser: ${CATEGORIAS_RECURSO.join(', ')}`})
+    }
+    if(estado !== undefined && !ESTADOS_RECURSO.includes(estado)){
+        return res.status(400).json({msg: `El estado debe ser: ${ESTADOS_RECURSO.join(', ')}`})
+    }
+    if(descripcion !== undefined && typeof descripcion !== 'string'){
+        return res.status(400).json({msg: 'La descripcion debe ser texto'})
+    }
+    if(imagen !== undefined && typeof imagen !== 'string'){
+        return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
+    }
+    next()
+}
+
+// valida los datos recibidos al actualizar un recurso (solo los enviados)
+const validarActualizarRecurso = (req, res, next) => {
+    const {nombre, descripcion, categoria, estado, imagen} = req.body
+    if([nombre, descripcion, categoria, estado, imagen].every(v => v === undefined)){
+        return res.status(400).json({msg: 'Envia al menos un campo a modificar'})
+    }
+    if(nombre !== undefined && (!textoValido(nombre) || nombre.trim().length < 3)){
+        return res.status(400).json({msg: 'El nombre debe tener al menos 3 caracteres'})
+    }
+    if(categoria !== undefined && !CATEGORIAS_RECURSO.includes(categoria)){
+        return res.status(400).json({msg: `La categoria debe ser: ${CATEGORIAS_RECURSO.join(', ')}`})
+    }
+    if(estado !== undefined && !ESTADOS_RECURSO.includes(estado)){
+        return res.status(400).json({msg: `El estado debe ser: ${ESTADOS_RECURSO.join(', ')}`})
+    }
+    if(descripcion !== undefined && typeof descripcion !== 'string'){
+        return res.status(400).json({msg: 'La descripcion debe ser texto'})
+    }
+    if(imagen !== undefined && typeof imagen !== 'string'){
+        return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
+    }
+    next()
+}
+
+// valida que el id de la ruta sea un ObjectId de MongoDB
+const validarIdRecurso = (req, res, next) => {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)){
+        return res.status(400).json({msg: 'El id del recurso no es valido'})
+    }
+    next()
+}
+
+export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso}

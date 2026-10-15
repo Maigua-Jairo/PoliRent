@@ -1,5 +1,6 @@
 import express from 'express'
 import authRouter from './routers/authRouter.js'
+import recursoRouter from './routers/recursoRouter.js'
 
 const app = express()
 app.use(express.json())
@@ -9,4 +10,5 @@ app.get('/',(req, res)=>{
     })
 })
 app.use('/api', authRouter)
+app.use('/api', recursoRouter)
 export default app 
