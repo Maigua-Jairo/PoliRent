@@ -32,11 +32,22 @@ const crearRecurso = async (req, res) => {
     }
 }
 
-//  consultar los recursos y su estado (filtros opcionales: categoria, estado)
+//  consultar los recursos y su estado (filtros opcionales: categoria, estado, buscar)
 const listarRecursos = async (req, res) => {
-    const {categoria, estado} = req.query
+    const {categoria, estado, buscar} = req.query
     try{
         const filtro = {}
+        if(buscar !== undefined){
+            if(typeof buscar !== 'string' || buscar.length > 100){
+                return res.status(400).json({msg: 'Busqueda no valida'})
+            }
+            const texto = buscar.trim()
+            if(texto){
+                // se escapan los caracteres especiales para buscar el texto literal (sin distinguir mayusculas)
+                const patron = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+                filtro.$or = [{nombre: patron}, {descripcion: patron}]
+            }
+        }
         if(categoria !== undefined){
             if(typeof categoria !== 'string' || !['tecnico', 'academico', 'recreativo'].includes(categoria)){
                 return res.status(400).json({msg: 'Categoria no valida'})

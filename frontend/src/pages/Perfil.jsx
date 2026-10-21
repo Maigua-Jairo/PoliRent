@@ -41,7 +41,7 @@ export default function Perfil() {
   }, [actualizarUsuario])
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-epn-900 dark:text-white">Mi perfil</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Consulta y actualiza la información de tu cuenta.</p>
@@ -122,7 +122,7 @@ function FormularioDatos({ usuario, onActualizado }) {
           <input {...campo('telefono', validarTelefono)} type="tel" inputMode="numeric" maxLength={10} autoComplete="tel" />
         </Field>
         <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
-          <select {...campo('facultad', validarFacultad)} className={`${inputClass(errors.facultad)} appearance-none pr-10`}>
+          <select {...campo('facultad', validarFacultad)} className={inputClass(errors.facultad, true, true)}>
             <option value="" disabled>
               Selecciona tu facultad
             </option>

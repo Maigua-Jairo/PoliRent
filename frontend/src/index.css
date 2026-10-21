@@ -13,6 +13,19 @@
   --color-brand-500: #1677ff;
   --color-brand-600: #0b63e5;
   --color-brand-400: #3b9bff;
+
+  /* Entrada escalonada de tarjetas (usar con motion-safe: y animation-delay) */
+  --animate-aparecer: aparecer 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer base {

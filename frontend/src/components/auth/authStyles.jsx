@@ -64,9 +64,14 @@ export const btnSecondary =
 export const btnPrimary =
   'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-semibold text-white shadow-lg shadow-brand-500/25 transition-colors hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60'
 
+/* ---------- Select o textarea sin icono a la izquierda ---------- */
+export const selectClass =
+  'w-full appearance-none rounded-lg border border-slate-300 bg-white py-2.5 pr-10 pl-3 text-sm text-slate-800 transition-colors focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100'
+
 /* ---------- Clase para inputs según estado de error ---------- */
-export const inputClass = (error) =>
-  `w-full rounded-lg border bg-white py-2.5 pr-3 pl-10 text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:ring-4 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 ${
+// conIcono: deja espacio para el icono de la izquierda; conFlecha: para la flecha de un <select>
+export const inputClass = (error, conIcono = true, conFlecha = false) =>
+  `w-full rounded-lg border bg-white py-2.5 ${conFlecha ? 'appearance-none pr-10' : 'pr-3'} ${conIcono ? 'pl-10' : 'pl-3'} text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:ring-4 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 ${
     error
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15'
       : 'border-slate-300 focus:border-brand-500 focus:ring-brand-500/15 dark:border-slate-700'

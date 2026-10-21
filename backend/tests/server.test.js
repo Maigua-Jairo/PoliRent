@@ -111,6 +111,12 @@ describe('Rutas protegidas', () => {
         expect(res.status).toBe(401)
     })
 
+    test('el catalogo publico valida los filtros', async () => {
+        expect((await request(app).get('/api/recursos?categoria=medicina')).status).toBe(400)
+        expect((await request(app).get('/api/recursos?estado=perdido')).status).toBe(400)
+        expect((await request(app).get(`/api/recursos?buscar=${'a'.repeat(101)}`)).status).toBe(400)
+    })
+
     test('el detalle publico de un recurso valida el id', async () => {
         const res = await request(app).get('/api/recursos/abc')
         expect(res.status).toBe(400)

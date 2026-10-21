@@ -42,6 +42,7 @@ Las variables del **backend** son secretas y solo se configuran en el servicio d
 | `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN` | ✅ | — |
 | `FRONTEND_URL` (origen permitido por CORS) | ✅ | — |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | ✅ | — |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (correo de recuperación) | ✅ | — |
 | `INSTITUTIONAL_EMAIL_DOMAIN` | ✅ | — |
 | `VITE_API_URL` | — | ✅ |
 

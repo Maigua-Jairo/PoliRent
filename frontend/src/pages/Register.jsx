@@ -154,7 +154,7 @@ export default function Register() {
 
         <div className="sm:col-span-2">
           <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
-            <select {...campo('facultad')} className={`${inputClass(errors.facultad)} appearance-none pr-10`}>
+            <select {...campo('facultad')} className={inputClass(errors.facultad, true, true)}>
               <option value="" disabled>
                 Selecciona tu facultad
               </option>

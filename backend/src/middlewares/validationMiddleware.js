@@ -137,8 +137,8 @@ const validarRecurso = (req, res, next) => {
     if(!textoValido(nombre) || !textoValido(categoria)){
         return res.status(400).json({msg: 'El nombre y la categoria son obligatorios'})
     }
-    if(nombre.trim().length < 3){
-        return res.status(400).json({msg: 'El nombre debe tener al menos 3 caracteres'})
+    if(nombre.trim().length < 3 || nombre.trim().length > 100){
+        return res.status(400).json({msg: 'El nombre debe tener entre 3 y 100 caracteres'})
     }
     if(!CATEGORIAS_RECURSO.includes(categoria)){
         return res.status(400).json({msg: `La categoria debe ser: ${CATEGORIAS_RECURSO.join(', ')}`})
@@ -146,8 +146,8 @@ const validarRecurso = (req, res, next) => {
     if(estado !== undefined && !ESTADOS_RECURSO.includes(estado)){
         return res.status(400).json({msg: `El estado debe ser: ${ESTADOS_RECURSO.join(', ')}`})
     }
-    if(descripcion !== undefined && typeof descripcion !== 'string'){
-        return res.status(400).json({msg: 'La descripcion debe ser texto'})
+    if(descripcion !== undefined && (typeof descripcion !== 'string' || descripcion.length > 500)){
+        return res.status(400).json({msg: 'La descripcion debe ser texto de maximo 500 caracteres'})
     }
     if(imagen !== undefined && typeof imagen !== 'string'){
         return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
@@ -161,8 +161,8 @@ const validarActualizarRecurso = (req, res, next) => {
     if([nombre, descripcion, categoria, estado, imagen].every(v => v === undefined) && !req.file){
         return res.status(400).json({msg: 'Envia al menos un campo a modificar'})
     }
-    if(nombre !== undefined && (!textoValido(nombre) || nombre.trim().length < 3)){
-        return res.status(400).json({msg: 'El nombre debe tener al menos 3 caracteres'})
+    if(nombre !== undefined && (!textoValido(nombre) || nombre.trim().length < 3 || nombre.trim().length > 100)){
+        return res.status(400).json({msg: 'El nombre debe tener entre 3 y 100 caracteres'})
     }
     if(categoria !== undefined && !CATEGORIAS_RECURSO.includes(categoria)){
         return res.status(400).json({msg: `La categoria debe ser: ${CATEGORIAS_RECURSO.join(', ')}`})
@@ -170,8 +170,8 @@ const validarActualizarRecurso = (req, res, next) => {
     if(estado !== undefined && !ESTADOS_RECURSO.includes(estado)){
         return res.status(400).json({msg: `El estado debe ser: ${ESTADOS_RECURSO.join(', ')}`})
     }
-    if(descripcion !== undefined && typeof descripcion !== 'string'){
-        return res.status(400).json({msg: 'La descripcion debe ser texto'})
+    if(descripcion !== undefined && (typeof descripcion !== 'string' || descripcion.length > 500)){
+        return res.status(400).json({msg: 'La descripcion debe ser texto de maximo 500 caracteres'})
     }
     if(imagen !== undefined && typeof imagen !== 'string'){
         return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})

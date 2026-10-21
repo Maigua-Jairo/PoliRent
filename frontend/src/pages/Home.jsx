@@ -4,16 +4,10 @@ import ThemeToggle from '../components/ThemeToggle.jsx'
 import Icon from '../components/Icon.jsx'
 import SesionUsuario from '../components/SesionUsuario.jsx'
 import { useAuthStore } from '../store/authStore.js'
+import { CATEGORIAS } from '../utils/recursos.jsx'
 
 /* ---------- Iconos propios de la landing ---------- */
 const icons = {
-  wrench: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
-  ball: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 3a14 14 0 0 1 0 18M3 12h18M5.6 5.6c3.5 2.8 9.3 2.8 12.8 0M5.6 18.4c3.5-2.8 9.3-2.8 12.8 0" />
-    </>
-  ),
   sparkles: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />,
   search: (
     <>
@@ -167,28 +161,6 @@ const FEATURES = [
   },
 ]
 
-// Deben coincidir con CATEGORIAS en backend/src/models/Recurso.js
-const CATEGORIAS = [
-  {
-    icon: 'wrench',
-    tone: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
-    title: 'Técnicos',
-    text: 'Herramientas, equipos electrónicos y kits de laboratorio para tus prácticas y proyectos.',
-  },
-  {
-    icon: 'book',
-    tone: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
-    title: 'Académicos',
-    text: 'Material bibliográfico y recursos de apoyo para tus asignaturas e investigaciones.',
-  },
-  {
-    icon: 'ball',
-    tone: 'bg-orange-100 text-orange-500 dark:bg-orange-500/15 dark:text-orange-400',
-    title: 'Recreativos',
-    text: 'Implementos deportivos y de ocio para actividades extracurriculares.',
-  },
-]
-
 const BENEFITS = [
   'Ahorra tiempo en la búsqueda de recursos.',
   'Aprovecha al máximo los recursos disponibles.',
@@ -322,9 +294,9 @@ export default function Home() {
                 <Link to={autenticado ? '/perfil' : '/registro'} className={`${btnPrimary} px-6 py-3`}>
                   Comenzar ahora <Icon size={18}>{icons.arrow}</Icon>
                 </Link>
-                <a href="#recursos" className={`${btnGhost} px-6 py-3`}>
+                <Link to="/recursos" className={`${btnGhost} px-6 py-3`}>
                   Explorar recursos <Icon size={18}>{icons.search}</Icon>
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -387,16 +359,20 @@ export default function Home() {
             </p>
             <div className="mt-6 grid gap-5 md:grid-cols-3">
               {CATEGORIAS.map((c) => (
-                <article
-                  key={c.title}
-                  className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+                <Link
+                  key={c.valor}
+                  to={`/recursos?categoria=${c.valor}`}
+                  className="group rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand-500/40 dark:bg-slate-900 dark:ring-slate-800"
                 >
-                  <div className={`grid h-12 w-12 place-items-center rounded-xl ${c.tone}`}>
-                    <Icon size={26} stroke={1.8}>{icons[c.icon]}</Icon>
+                  <div className={`grid h-12 w-12 place-items-center rounded-xl ${c.tono}`}>
+                    <Icon size={26} stroke={1.8}>{c.icono}</Icon>
                   </div>
-                  <h3 className="mt-4 text-lg font-bold text-epn-900 dark:text-white">{c.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{c.text}</p>
-                </article>
+                  <h3 className="mt-4 text-lg font-bold text-epn-900 dark:text-white">{c.plural}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{c.descripcion}</p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 dark:text-brand-400">
+                    Ver recursos <Icon size={16} className="transition-transform group-hover:translate-x-1">{icons.arrow}</Icon>
+                  </span>
+                </Link>
               ))}
             </div>
           </div>
