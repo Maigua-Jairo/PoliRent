@@ -1,4 +1,7 @@
 import Recurso from '../models/Recurso.js'
+import {cloudinaryConfigurado, subirImagen, eliminarImagen} from '../config/cloudinary.js'
+
+const MSG_SIN_CLOUDINARY = 'La subida de imagenes no esta disponible: falta configurar Cloudinary'
 
 //  registrar un recurso
 const crearRecurso = async (req, res) => {
@@ -8,12 +11,20 @@ const crearRecurso = async (req, res) => {
         if(existe){
             return res.status(400).json({msg: 'Ya existe un recurso con ese nombre en la categoria'})
         }
+        let imagenSubida = null
+        if(req.file){
+            if(!cloudinaryConfigurado()){
+                return res.status(503).json({msg: MSG_SIN_CLOUDINARY})
+            }
+            imagenSubida = await subirImagen(req.file.buffer)
+        }
         const recurso = await Recurso.create({
             nombre: nombre.trim(),
             descripcion: descripcion?.trim(),
             categoria,
             estado,
-            imagen: imagen?.trim()
+            imagen: imagenSubida ? imagenSubida.url : imagen?.trim(),
+            imagenId: imagenSubida?.publicId ?? null
         })
         res.status(201).json({msg: 'Recurso registrado correctamente', recurso})
     }catch(error){
@@ -78,8 +89,23 @@ const actualizarRecurso = async (req, res) => {
         recurso.categoria = nuevaCategoria
         if(descripcion !== undefined) recurso.descripcion = descripcion.trim()
         if(estado !== undefined) recurso.estado = estado
-        if(imagen !== undefined) recurso.imagen = imagen.trim()
+        // una imagen subida reemplaza a la anterior; una URL en texto solo se usa si no hay archivo
+        let imagenAnteriorId = null
+        if(req.file){
+            if(!cloudinaryConfigurado()){
+                return res.status(503).json({msg: MSG_SIN_CLOUDINARY})
+            }
+            const imagenSubida = await subirImagen(req.file.buffer)
+            imagenAnteriorId = recurso.imagenId
+            recurso.imagen = imagenSubida.url
+            recurso.imagenId = imagenSubida.publicId
+        }else if(imagen !== undefined){
+            imagenAnteriorId = recurso.imagenId
+            recurso.imagen = imagen.trim()
+            recurso.imagenId = null
+        }
         await recurso.save()
+        await eliminarImagen(imagenAnteriorId)
         res.status(200).json({msg: 'Recurso actualizado correctamente', recurso})
     }catch(error){
         res.status(500).json({msg: `Error al actualizar el recurso - ${error}`})
@@ -97,6 +123,7 @@ const eliminarRecurso = async (req, res) => {
             return res.status(400).json({msg: 'No se puede eliminar un recurso que esta prestado'})
         }
         await recurso.deleteOne()
+        await eliminarImagen(recurso.imagenId)
         res.status(200).json({msg: 'Recurso eliminado correctamente'})
     }catch(error){
         res.status(500).json({msg: `Error al eliminar el recurso - ${error}`})

@@ -28,6 +28,11 @@ const RecursoSchema = new Schema({
         type: String,
         trim: true,
         default: ''
+    },
+    // identificador de la imagen en cloudinary, necesario para reemplazarla o eliminarla
+    imagenId:{
+        type: String,
+        default: null
     }
 },{
     timestamps: true

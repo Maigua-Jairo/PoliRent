@@ -2,47 +2,48 @@ import crypto from 'crypto'
 import Usuario from '../models/Usuario.js'
 import {crearTokenJWT} from '../helpers/jwtHelper.js'
 
-const datosUsuario = (u) => ({ id: u._id, nombre: u.nombre, correo: u.correo, rol: u.rol })
+const datosUsuario = (u) => ({
+    id: u._id,
+    nombres: u.nombres,
+    apellidos: u.apellidos,
+    cedula: u.cedula,
+    correo: u.correo,
+    telefono: u.telefono,
+    facultad: u.facultad,
+    rol: u.rol
+})
 
-// registrarse
+// registrarse (siempre como estudiante; el rol administrador se asigna en la base de datos)
 const registro = async (req, res) => {
-    const {nombre, password, rol, claveAdmin} = req.body
+    const {nombres, apellidos, cedula, telefono, facultad, password} = req.body
     const correo = req.body.correo.trim().toLowerCase()
     try{
-        const esAdmin = rol === 'administrador'
-        if(rol !== undefined && rol !== 'estudiante' && !esAdmin){
-            return res.status(400).json({msg: 'Rol no valido'})
-        }
-        if(esAdmin){
-            // solo se crea un administrador con la clave secreta del sistema
-            if(!process.env.ADMIN_REGISTRATION_KEY || claveAdmin !== process.env.ADMIN_REGISTRATION_KEY){
-                return res.status(403).json({msg: 'Clave de administrador incorrecta'})
-            }
-        }else{
-            // los estudiantes se registran con el correo de la institucion
-            const dominio = process.env.INSTITUTIONAL_EMAIL_DOMAIN
-            if(dominio && !correo.endsWith(`@${dominio.toLowerCase()}`)){
-                return res.status(400).json({msg: `Debes usar el correo institucional @${dominio}`})
-            }
-        }
-        const existe = await Usuario.findOne({correo})
-        if(existe){
+        if(await Usuario.exists({correo})){
             return res.status(400).json({msg: 'El correo ya esta registrado'})
         }
+        if(await Usuario.exists({cedula})){
+            return res.status(400).json({msg: 'La cedula ya esta registrada'})
+        }
         const nuevoUsuario = new Usuario({
-            nombre: nombre.trim(),
+            nombres: nombres.trim(),
+            apellidos: apellidos.trim(),
+            cedula,
             correo,
-            rol: esAdmin ? 'administrador' : 'estudiante'
+            telefono,
+            facultad
         })
         nuevoUsuario.password = await nuevoUsuario.encryptPassword(password)
         await nuevoUsuario.save()
-        const token = crearTokenJWT(nuevoUsuario._id, nuevoUsuario.rol, nuevoUsuario.versionSesion)
+        // tras registrarse el usuario inicia sesion desde la pantalla de login
         res.status(201).json({
-            msg: 'Usuario registrado correctamente',
-            token,
+            msg: 'Usuario registrado correctamente, ya puedes iniciar sesion',
             usuario: datosUsuario(nuevoUsuario)
         })
     }catch(error){
+        // dos registros simultaneos con el mismo correo o cedula chocan con el indice unico
+        if(error.code === 11000){
+            return res.status(400).json({msg: 'El correo o la cedula ya estan registrados'})
+        }
         res.status(500).json({msg: `Error al registrar usuario - ${error}`})
     }
 }
@@ -83,14 +84,15 @@ const perfil = async (req, res) => {
     res.status(200).json({usuario: {...datosUsuario(u), createdAt: u.createdAt, updatedAt: u.updatedAt}})
 }
 
-// modificar perfil (nombre y/o contraseña)
+// modificar perfil (datos personales y/o contraseña; la cedula y el correo no cambian)
 const actualizarPerfil = async (req, res) => {
-    const {nombre, password, passwordActual} = req.body
+    const {nombres, apellidos, telefono, facultad, password, passwordActual} = req.body
     try{
         const usuarioBDD = await Usuario.findById(req.usuarioHeader._id)
-        if(nombre !== undefined){
-            usuarioBDD.nombre = nombre.trim()
-        }
+        if(nombres !== undefined) usuarioBDD.nombres = nombres.trim()
+        if(apellidos !== undefined) usuarioBDD.apellidos = apellidos.trim()
+        if(telefono !== undefined) usuarioBDD.telefono = telefono
+        if(facultad !== undefined) usuarioBDD.facultad = facultad
         if(password !== undefined){
             if(!(await usuarioBDD.matchPassword(passwordActual))){
                 return res.status(401).json({msg: 'La contraseña actual es incorrecta'})
@@ -122,8 +124,8 @@ const recuperarClave = async (req, res) => {
         }
         const token = usuarioBDD.crearTokenRecuperacion()
         await usuarioBDD.save()
-        // sin servicio de correo: en desarrollo el token se devuelve en la respuesta
-        const enDesarrollo = process.env.NODE_ENV !== 'production'
+        // sin servicio de correo: solo en desarrollo el token se devuelve en la respuesta
+        const enDesarrollo = process.env.NODE_ENV === 'development'
         res.status(200).json({msg: mensaje, ...(enDesarrollo && {token})})
     }catch(error){
         res.status(500).json({msg: `Error al solicitar la recuperacion de clave - ${error}`})
