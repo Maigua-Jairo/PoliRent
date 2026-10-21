@@ -1,6 +1,14 @@
+# Dependencias y builds
 node_modules/
-.env
-uploads/*
-!uploads/.gitkeep
+dist/
 coverage/
+
+# Variables de entorno (nunca se suben)
+.env
+.env.*
+!.env.example
+
+# Logs y sistema
 *.log
+.DS_Store
+Thumbs.db
