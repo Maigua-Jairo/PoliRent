@@ -76,6 +76,19 @@ describe('Validacion del registro', () => {
     })
 })
 
+describe('Recuperacion de clave', () => {
+    test('sin SMTP configurado (fuera de desarrollo) responde 503 sin revelar si el correo existe', async () => {
+        const res = await request(app).post('/api/recuperar-clave').send({correo: 'juan.perez@epn.edu.ec'})
+        expect(res.status).toBe(503)
+        expect(res.body.msg).toMatch(/servicio de correo/)
+    })
+
+    test('exige que la nueva clave cumpla las reglas', async () => {
+        const res = await request(app).post('/api/recuperar-clave/abc').send({password: 'corta', confirmarPassword: 'corta'})
+        expect(res.status).toBe(400)
+    })
+})
+
 describe('Rutas protegidas', () => {
     test('el perfil exige token', async () => {
         const res = await request(app).get('/api/perfil')

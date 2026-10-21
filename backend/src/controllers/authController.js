@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import Usuario from '../models/Usuario.js'
 import {crearTokenJWT} from '../helpers/jwtHelper.js'
+import {correoConfigurado, enviarCorreoRecuperacion} from '../config/mailer.js'
 
 const datosUsuario = (u) => ({
     id: u._id,
@@ -117,7 +118,12 @@ const actualizarPerfil = async (req, res) => {
 // recuperar clave (paso 1: solicitar)
 const recuperarClave = async (req, res) => {
     const correo = req.body.correo.trim().toLowerCase()
-    const mensaje = 'Si el correo esta registrado, se genero un enlace de recuperacion valido por 15 minutos'
+    const mensaje = 'Si el correo esta registrado, te enviamos un enlace de recuperacion valido por 15 minutos'
+    const enDesarrollo = process.env.NODE_ENV === 'development'
+    // se valida antes de buscar al usuario para no revelar que correos estan registrados
+    if(!correoConfigurado() && !enDesarrollo){
+        return res.status(503).json({msg: 'El servicio de correo no esta disponible, intenta mas tarde'})
+    }
     try{
         const usuarioBDD = await Usuario.findOne({correo})
         if(!usuarioBDD){
@@ -125,8 +131,15 @@ const recuperarClave = async (req, res) => {
         }
         const token = usuarioBDD.crearTokenRecuperacion()
         await usuarioBDD.save()
-        // sin servicio de correo: solo en desarrollo el token se devuelve en la respuesta
-        const enDesarrollo = process.env.NODE_ENV === 'development'
+        if(correoConfigurado()){
+            try{
+                await enviarCorreoRecuperacion(usuarioBDD, token)
+            }catch(error){
+                console.error(`Error al enviar el correo de recuperacion: ${error.message}`)
+                return res.status(502).json({msg: 'No se pudo enviar el correo de recuperacion, intenta mas tarde'})
+            }
+        }
+        // en desarrollo tambien se devuelve el token para probar el flujo sin revisar el correo
         res.status(200).json({msg: mensaje, ...(enDesarrollo && {token})})
     }catch(error){
         res.status(500).json({msg: `Error al solicitar la recuperacion de clave - ${error}`})
