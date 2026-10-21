@@ -1,39 +1,52 @@
 # AGENTS.md
 
-PoliRent — React SPA for loaning technical equipment at Escuela Politécnica Nacional (UI copy is in Spanish; keep new copy in Spanish).
+PoliRent — sistema de préstamo y recomendación de recursos para las asociaciones de estudiantes de la Escuela Politécnica Nacional (UI y mensajes en español; mantener el texto nuevo en español). Los requisitos están en las historias de usuario HU-001…HU-011 del trabajo de titulación del frontend.
 
-## Layout
+## Layout (monorepo)
 
-- The entire app lives in `Frontend/`. The repo root has no manifest, no workspace, no CI, no tests.
-- Run **all** npm commands from `C:\PoliRent\Frontend` (there is no root `package.json`).
+- `backend/` — API REST Express + Mongoose (ESM). Entrada `src/index.js`, app en `src/server.js`.
+- `frontend/` — SPA React + Vite.
+- No hay `package.json` en la raíz: ejecuta los comandos npm dentro de cada carpeta.
 
-## Commands (run in `Frontend/`)
+## Comandos
 
 ```sh
-npm run dev      # Vite dev server
-npm run build    # production build -> dist/
-npm run lint     # oxlint (only check; exits 0 with warnings)
-npm run preview  # serve dist/
+# backend/
+npm run dev      # nodemon
+npm test         # Jest (ESM vía --experimental-vm-modules) + Supertest; no usa base de datos
+
+# frontend/
+npm run dev      # Vite
+npm test         # Vitest + Testing Library (jsdom)
+npm run lint     # oxlint
+npm run build    # producción -> dist/
 ```
 
-There is no test or typecheck command — do not invent one; `npm run lint` + `npm run build` is the full verification. No TypeScript; plain JS/JSX with explicit `.jsx` extensions in relative imports.
+Verificación completa: `npm test` en ambos + `npm run lint` y `npm run build` en el frontend.
 
-## Stack quirks
+## Contrato backend ↔ frontend
 
-- **Tailwind v4**: no `tailwind.config.js`. All theme is in `src/index.css` (`@import "tailwindcss"`, `@theme` tokens `epn-*` / `brand-*` / `font-script`, and `@custom-variant dark`). Add design tokens there, not in a config file.
-- **Dark mode** is class-based (`.dark` on `<html>`), driven by `src/hooks/darkMode.js` (zustand + `persist` under localStorage key `theme`, which hydrates synchronously; the module toggles the DOM class at load and on every change). The UI control is `src/components/ThemeToggle.jsx`, rendered in `Home.jsx` and `AuthLayout.jsx`. Every new component needs `dark:` variants (convention: `bg-slate-950` page, `bg-slate-900` cards, `slate-800` borders/rings, `text-white` headings, `text-slate-400` body). Don't add a separate theme mechanism.
-- Router is `BrowserRouter` in `src/App.jsx`: `/`, `/login`, `/registro`, wildcard redirects to `/`.
+- Las reglas de validación están duplicadas a propósito y deben coincidir:
+  `backend/src/middlewares/validationMiddleware.js` ↔ `frontend/src/utils/validaciones.js`
+  (correo `@epn.edu.ec`, cédula ecuatoriana con dígito verificador y única, teléfono `09XXXXXXXX`, contraseña ≥ 8 con mayúscula/minúscula/número).
+- Listas cerradas que deben coincidir: `FACULTADES` (`backend/src/models/Usuario.js` ↔ `frontend/src/utils/validaciones.js`) y `CATEGORIAS` de recursos (`backend/src/models/Recurso.js` ↔ `CATEGORIAS` en `frontend/src/pages/Home.jsx`).
+- Errores: el backend responde `{ msg }`. Un `401` en una petición autenticada cierra la sesión en el frontend (interceptor de `api/axiosCliente.js`), así que los errores de datos deben ser `400`, nunca `401`.
+- Registro: siempre crea `estudiante` y no devuelve token; el frontend redirige a `/login`. Los administradores se asignan cambiando `rol` en la base de datos.
+- `GET /api/recursos` y `GET /api/recursos/:id` son públicos; crear/editar/eliminar exige rol `administrador`. Las imágenes llegan como `multipart/form-data` en el campo `imagen` y se suben a Cloudinary (sin variables `CLOUDINARY_*` la subida responde 503).
 
-## Known landmines
+## Frontend
 
-- **oxlint does not flag undefined identifiers** (no `no-undef`), and the build doesn't either — a missing import (e.g. a hook) only blows up at runtime when the route renders. Double-check imports by hand.
-- API layer: `src/api/axiosCliente.js` (axios with Bearer token from `src/store/authStore.js`, zustand + `persist` key `polirent-auth`) → `src/services/authService.js` (`iniciarSesion` → `POST /api/login`, `registrarUsuario` → `POST /api/registro`, `obtenerMensajeError`). Add new endpoints as service functions there, not raw axios calls in pages.
-- `.env` sets `VITE_API_URL` (currently the Render backend). Never commit secrets there.
-- `src/pages/Home.jsx` references `/images/hero-campus.jpg` and `/images/students.jpg`, but `public/images/` is empty (build warns, images 404 at runtime; gradient fallbacks show). Put the images in `public/images/`.
-- `dist/` is gitignored but may contain a stale build in the working tree — regenerate it, never hand-edit it.
-- Lint currently reports 2 pre-existing `react(purity)` warnings (`Date` called during render in `AuthLayout.jsx` and `Home.jsx`). They don't fail the build; don't "fix" unrelated ones in a drive-by.
+- **Tailwind v4**: sin `tailwind.config.js`; tokens (`epn-*`, `brand-*`, `font-script`) y `@custom-variant dark` en `src/index.css`.
+- **Modo oscuro** por clase `.dark` en `<html>`, manejado por `src/hooks/darkMode.js` (zustand + persist, clave `theme`) y `components/ThemeToggle.jsx`. Todo componente nuevo necesita variantes `dark:`.
+- **Sesión**: `src/store/authStore.js` (zustand + persist, clave `polirent-auth`) guarda `token` y `usuario` (con `rol`). Cerrar sesión con `hooks/useCerrarSesion.js`.
+- **API**: agrega endpoints como funciones en `src/services/*Service.js`, nunca llamadas axios sueltas en las páginas.
+- **Rutas** (`src/App.jsx`): `SoloInvitados` envuelve login/registro/recuperación; `RutaProtegida` (prop opcional `roles`) + `AppLayout` envuelven las pantallas internas.
+- **Formularios**: React Hook Form; adapta los validadores con `regla()` de `utils/validaciones.js`. Primitivas compartidas: `Field`/`AuthLayout`, `PasswordInput`, `Alerta`, `Icon`, clases en `components/auth/authStyles.jsx`.
+- oxlint **no detecta identificadores sin definir** y el build tampoco: cada pantalla nueva debe tener al menos una prueba que la renderice.
+- `src/pages/Home.jsx` usa `/images/hero-campus.jpg` y `/images/students.jpg`, que aún no existen en `public/images/` (se ve el degradado de respaldo).
+- Lint tiene 2 advertencias `react(purity)` conocidas (`new Date()` en `AuthLayout.jsx` y `Home.jsx`); no bloquean.
 
-## Conventions
+## Backend
 
-- Validation helpers live in `src/utils/validaciones.js`: emails must be `@epn.edu.ec`, Ecuadorian cédula checksum, phones `09XXXXXXXX`. Reuse them for any new forms instead of writing ad-hoc regexes.
-- Shared auth form primitives (`AuthLayout`, `Field`, `Icon`, `PasswordInput`, style strings in `authStyles.jsx`) — extend these rather than rebuilding login/register markup. Note `Home.jsx` duplicates some icon/button constants locally.
+- Archivos vacíos reservados para trabajo futuro: préstamos (`prestamoController`, `prestamoRouter`, `models/Prestamo`), recomendaciones (`recomendacionController`, `recomendacionRouter`), QR (`helpers/qrHelper`), `helpers/responseHelper`, `routers/index`. No los borres.
+- `POST /api/recuperar-clave` devuelve el token en la respuesta solo con `NODE_ENV=development` (no hay servicio de correo todavía).

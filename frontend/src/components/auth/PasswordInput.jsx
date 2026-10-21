@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Icon } from './AuthLayout.jsx'
+import Icon from '../Icon.jsx'
 import { icons, inputClass } from './authStyles.jsx'
 
+// En React 19 `ref` llega como prop, así que funciona directo con register() de react-hook-form
 export default function PasswordInput({ error, ...props }) {
   const [visible, setVisible] = useState(false)
 

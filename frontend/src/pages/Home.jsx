@@ -1,26 +1,20 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import Icon from '../components/Icon.jsx'
+import SesionUsuario from '../components/SesionUsuario.jsx'
+import { useAuthStore } from '../store/authStore.js'
 
-/* ---------- Iconos (SVG inline, estilo lineal) ---------- */
-const Icon = ({ children, size = 20, stroke = 2, className = '' }) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={stroke}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    {children}
-  </svg>
-)
-
+/* ---------- Iconos propios de la landing ---------- */
 const icons = {
+  wrench: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
+  ball: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a14 14 0 0 1 0 18M3 12h18M5.6 5.6c3.5 2.8 9.3 2.8 12.8 0M5.6 18.4c3.5-2.8 9.3-2.8 12.8 0" />
+    </>
+  ),
+  sparkles: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />,
   search: (
     <>
       <circle cx="11" cy="11" r="7" />
@@ -141,8 +135,8 @@ const btnGhost = `${btn} border border-white/40 text-white hover:bg-white/10`
 const NAV_LINKS = [
   { href: '#inicio', label: 'Inicio' },
   { href: '#recursos', label: 'Recursos' },
-  { href: '#como-funciona', label: 'Cómo funciona' },
-  { href: '#sobre', label: 'Sobre el proyecto' },
+  { href: '#como-funciona', label: 'Préstamos' },
+  { href: '#recomendaciones', label: 'Recomendaciones' },
   { href: '#contacto', label: 'Contacto' },
 ]
 
@@ -151,7 +145,7 @@ const FEATURES = [
     icon: 'laptop',
     tone: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
     title: 'Recursos variados',
-    text: 'Equipos tecnológicos y materiales manuales.',
+    text: 'Recursos técnicos, académicos y recreativos en un solo catálogo.',
   },
   {
     icon: 'brain',
@@ -168,8 +162,30 @@ const FEATURES = [
   {
     icon: 'users',
     tone: 'bg-orange-100 text-orange-500 dark:bg-orange-500/15 dark:text-orange-400',
-    title: 'Para toda la comunidad EPN',
-    text: 'Estudiantes, docentes y personal administrativo.',
+    title: 'Asociaciones estudiantiles',
+    text: 'Recursos administrados por las asociaciones de estudiantes de la EPN.',
+  },
+]
+
+// Deben coincidir con CATEGORIAS en backend/src/models/Recurso.js
+const CATEGORIAS = [
+  {
+    icon: 'wrench',
+    tone: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
+    title: 'Técnicos',
+    text: 'Herramientas, equipos electrónicos y kits de laboratorio para tus prácticas y proyectos.',
+  },
+  {
+    icon: 'book',
+    tone: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+    title: 'Académicos',
+    text: 'Material bibliográfico y recursos de apoyo para tus asignaturas e investigaciones.',
+  },
+  {
+    icon: 'ball',
+    tone: 'bg-orange-100 text-orange-500 dark:bg-orange-500/15 dark:text-orange-400',
+    title: 'Recreativos',
+    text: 'Implementos deportivos y de ocio para actividades extracurriculares.',
   },
 ]
 
@@ -191,6 +207,7 @@ const container = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10'
 /* ---------- Componente ---------- */
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const autenticado = useAuthStore((state) => Boolean(state.token))
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -216,18 +233,18 @@ export default function Home() {
           </nav>
 
           <div className="hidden items-center gap-4 lg:flex">
-            <button
-              className="rounded-lg p-2 text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label="Buscar"
-            >
-              <Icon size={22}>{icons.search}</Icon>
-            </button>
-            <Link to="/login" className={`${btnOutline} px-5 py-2.5 text-sm`}>
-              Iniciar sesión
-            </Link>
-            <Link to="/registro" className={`${btnPrimary} px-5 py-2.5 text-sm`}>
-              Registrarse
-            </Link>
+            {autenticado ? (
+              <SesionUsuario />
+            ) : (
+              <>
+                <Link to="/login" className={`${btnOutline} px-5 py-2.5 text-sm`}>
+                  Iniciar sesión
+                </Link>
+                <Link to="/registro" className={`${btnPrimary} px-5 py-2.5 text-sm`}>
+                  Registrarse
+                </Link>
+              </>
+            )}
             <ThemeToggle />
           </div>
 
@@ -260,14 +277,18 @@ export default function Home() {
                   {link.label}
                 </a>
               ))}
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Link to="/login" className={`${btnOutline} py-2.5 text-sm`}>
-                  Iniciar sesión
-                </Link>
-                <Link to="/registro" className={`${btnPrimary} py-2.5 text-sm`}>
-                  Registrarse
-                </Link>
-              </div>
+              {autenticado ? (
+                <SesionUsuario className="mt-3 justify-between" />
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Link to="/login" className={`${btnOutline} py-2.5 text-sm`}>
+                    Iniciar sesión
+                  </Link>
+                  <Link to="/registro" className={`${btnPrimary} py-2.5 text-sm`}>
+                    Registrarse
+                  </Link>
+                </div>
+              )}
             </div>
           </nav>
         )}
@@ -293,12 +314,12 @@ export default function Home() {
                 Tu proyecto, nuestras <span className="block text-brand-400">herramientas</span>
               </h1>
               <p className="mt-4 text-base leading-relaxed text-slate-200 sm:text-lg">
-                Gestiona el préstamo de recursos técnicos y manuales de la Escuela
-                Politécnica Nacional y recibe recomendaciones inteligentes según tus
-                necesidades académicas.
+                Gestiona el préstamo de recursos técnicos, académicos y recreativos de
+                las asociaciones estudiantiles de la Escuela Politécnica Nacional y recibe
+                recomendaciones inteligentes según tus necesidades académicas.
               </p>
               <div className="mt-7 flex flex-wrap gap-4">
-                <Link to="/registro" className={`${btnPrimary} px-6 py-3`}>
+                <Link to={autenticado ? '/perfil' : '/registro'} className={`${btnPrimary} px-6 py-3`}>
                   Comenzar ahora <Icon size={18}>{icons.arrow}</Icon>
                 </Link>
                 <a href="#recursos" className={`${btnGhost} px-6 py-3`}>
@@ -336,7 +357,7 @@ export default function Home() {
         </section>
 
         {/* FEATURES */}
-        <section id="recursos" className="py-10">
+        <section className="py-10">
           <div className={`${container} grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0`}>
             {FEATURES.map((f, i) => (
               <article
@@ -354,6 +375,30 @@ export default function Home() {
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+
+        {/* RECURSOS POR CATEGORÍA */}
+        <section id="recursos" className="scroll-mt-16 pb-10">
+          <div className={container}>
+            <h2 className="text-2xl font-extrabold text-epn-900 dark:text-white">Recursos por categoría</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Las asociaciones estudiantiles ponen a tu disposición tres tipos de recursos.
+            </p>
+            <div className="mt-6 grid gap-5 md:grid-cols-3">
+              {CATEGORIAS.map((c) => (
+                <article
+                  key={c.title}
+                  className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+                >
+                  <div className={`grid h-12 w-12 place-items-center rounded-xl ${c.tone}`}>
+                    <Icon size={26} stroke={1.8}>{icons[c.icon]}</Icon>
+                  </div>
+                  <h3 className="mt-4 text-lg font-bold text-epn-900 dark:text-white">{c.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{c.text}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -428,6 +473,24 @@ export default function Home() {
           </div>
         </section>
 
+        {/* RECOMENDACIONES */}
+        <section id="recomendaciones" className="scroll-mt-16 pb-10">
+          <div className={container}>
+            <div className="grid items-center gap-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 md:grid-cols-[auto_1fr] md:p-8 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+                <Icon size={34} stroke={1.8}>{icons.sparkles}</Icon>
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold text-epn-900 dark:text-white">Recomendaciones inteligentes</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                  Describe tu proyecto académico o práctica y el sistema te sugerirá recursos similares o
+                  complementarios disponibles en las asociaciones, para que no se te escape ninguna herramienta útil.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CTA */}
         <section className="relative overflow-hidden bg-epn-900">
           {/* Silueta de montaña decorativa */}
@@ -454,14 +517,16 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-4 md:mr-24">
-              <Link to="/registro" className={`${btnPrimary} px-8 py-2.5 text-sm`}>
-                <Icon size={16}>{icons.user}</Icon> Registrarse
-              </Link>
-              <Link to="/login" className={`${btnGhost} border-brand-400/60 px-6 py-2.5 text-sm`}>
-                <Icon size={16}>{icons.login}</Icon> Iniciar sesión
-              </Link>
-            </div>
+            {!autenticado && (
+              <div className="flex flex-wrap gap-4 md:mr-24">
+                <Link to="/registro" className={`${btnPrimary} px-8 py-2.5 text-sm`}>
+                  <Icon size={16}>{icons.user}</Icon> Registrarse
+                </Link>
+                <Link to="/login" className={`${btnGhost} border-brand-400/60 px-6 py-2.5 text-sm`}>
+                  <Icon size={16}>{icons.login}</Icon> Iniciar sesión
+                </Link>
+              </div>
+            )}
           </div>
         </section>
       </main>

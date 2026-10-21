@@ -1,13 +1,20 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import AuthLayout, { Field, Icon } from '../components/auth/AuthLayout.jsx'
+import { useForm } from 'react-hook-form'
+import { Link, useNavigate } from 'react-router-dom'
+import AuthLayout, { Field } from '../components/auth/AuthLayout.jsx'
 import { btnPrimary, icons, inputClass } from '../components/auth/authStyles.jsx'
 import PasswordInput from '../components/auth/PasswordInput.jsx'
+import Alerta from '../components/Alerta.jsx'
+import Icon from '../components/Icon.jsx'
 import {
   DOMINIO_INSTITUCIONAL,
+  FACULTADES,
+  regla,
   validarCedula,
+  validarConfirmacion,
   validarContrasena,
   validarCorreoEPN,
+  validarFacultad,
   validarNombre,
   validarTelefono,
 } from '../utils/validaciones.js'
@@ -24,65 +31,30 @@ const INICIAL = {
   confirmarContrasena: '',
 }
 
-const validar = {
-  nombres: (v) => validarNombre(v, 'El nombre'),
-  apellidos: (v) => validarNombre(v, 'El apellido'),
-  cedula: validarCedula,
-  correo: validarCorreoEPN,
-  telefono: validarTelefono,
-  facultad: (v) => (v ? '' : 'Selecciona tu facultad.'),
-  contrasena: validarContrasena,
-  confirmarContrasena: (v, form) => {
-    if (!v) return 'Confirma tu contraseña.'
-    if (v !== form.contrasena) return 'Las contraseñas no coinciden.'
-    return ''
-  },
+const REGLAS = {
+  nombres: { validate: regla((v) => validarNombre(v, 'El nombre')) },
+  apellidos: { validate: regla((v) => validarNombre(v, 'El apellido')) },
+  cedula: { validate: regla(validarCedula) },
+  correo: { validate: regla(validarCorreoEPN) },
+  telefono: { validate: regla(validarTelefono) },
+  facultad: { validate: regla(validarFacultad) },
+  contrasena: { validate: regla(validarContrasena) },
+  confirmarContrasena: { validate: regla(validarConfirmacion('contrasena')) },
 }
 
-// Campos que solo aceptan dígitos
-const NUMERICOS = { cedula: 10, telefono: 10 }
-
 export default function Register() {
-  const [form, setForm] = useState(INICIAL)
-  const [errores, setErrores] = useState({})
+  const navigate = useNavigate()
   const [errorServidor, setErrorServidor] = useState('')
-  const [mensajeExito, setMensajeExito] = useState('')
-  const [cargando, setCargando] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    trigger,
+    formState: { errors, isSubmitting },
+  } = useForm({ mode: 'onTouched', defaultValues: INICIAL })
 
-  const handleChange = (e) => {
-    const { name } = e.target
-    let { value } = e.target
-    if (NUMERICOS[name]) value = value.replace(/\D/g, '').slice(0, NUMERICOS[name])
-
-    const siguiente = { ...form, [name]: value }
-    setForm(siguiente)
+  const onSubmit = async (form) => {
     setErrorServidor('')
-    setMensajeExito('')
-    setErrores((er) => {
-      const nuevos = { ...er }
-      if (er[name]) nuevos[name] = validar[name](value, siguiente)
-      // Revalida la confirmación si cambia la contraseña principal
-      if (name === 'contrasena' && er.confirmarContrasena !== undefined && siguiente.confirmarContrasena) {
-        nuevos.confirmarContrasena = validar.confirmarContrasena(siguiente.confirmarContrasena, siguiente)
-      }
-      return nuevos
-    })
-  }
-
-  const handleBlur = (e) => {
-    const { name, value } = e.target
-    setErrores((er) => ({ ...er, [name]: validar[name](value, form) }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const nuevos = Object.fromEntries(Object.keys(validar).map((k) => [k, validar[k](form[k], form)]))
-    setErrores(nuevos)
-    if (Object.values(nuevos).some(Boolean)) return
-
-    setCargando(true)
-    setErrorServidor('')
-    setMensajeExito('')
     try {
       const respuesta = await registrarUsuario({
         nombres: form.nombres.trim(),
@@ -90,30 +62,47 @@ export default function Register() {
         cedula: form.cedula,
         correo: form.correo.trim(),
         telefono: form.telefono,
-        facultad: form.facultad.trim(),
+        facultad: form.facultad,
         password: form.contrasena,
       })
-      setMensajeExito(respuesta.msg || respuesta.message || 'Tu cuenta fue creada correctamente.')
-      setForm(INICIAL)
-      setErrores({})
+      navigate('/login', {
+        replace: true,
+        state: { mensaje: respuesta.msg || 'Tu cuenta fue creada correctamente. Ya puedes iniciar sesión.' },
+      })
     } catch (error) {
       setErrorServidor(obtenerMensajeError(error))
-    } finally {
-      setCargando(false)
     }
   }
 
-  // Props comunes para inputs de texto
+  // Props comunes: registro en el formulario + accesibilidad + estilo según error
   const campo = (name) => ({
     id: name,
-    name,
-    value: form[name],
-    onChange: handleChange,
-    onBlur: handleBlur,
-    'aria-invalid': !!errores[name],
-    'aria-describedby': errores[name] ? `${name}-error` : undefined,
-    className: inputClass(errores[name]),
+    'aria-invalid': !!errors[name],
+    'aria-describedby': errors[name] ? `${name}-error` : undefined,
+    className: inputClass(errors[name]),
+    ...register(name, REGLAS[name]),
   })
+
+  // Cédula y teléfono solo aceptan 10 dígitos
+  const campoNumerico = (name) => {
+    const props = campo(name)
+    return {
+      ...props,
+      inputMode: 'numeric',
+      maxLength: 10,
+      onChange: (e) => {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10)
+        return props.onChange(e)
+      },
+    }
+  }
+
+  // Revalida la confirmación cuando cambia la contraseña principal
+  const contrasena = register('contrasena', REGLAS.contrasena)
+  const onChangeContrasena = async (e) => {
+    await contrasena.onChange(e)
+    if (getValues('confirmarContrasena')) trigger('confirmarContrasena')
+  }
 
   return (
     <AuthLayout
@@ -129,36 +118,26 @@ export default function Register() {
       }
     >
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         noValidate
         className="grid gap-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2 sm:p-8 dark:bg-slate-900 dark:ring-slate-800"
       >
-        {errorServidor && (
-          <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-200 sm:col-span-2 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
-            {errorServidor}
-          </div>
-        )}
+        <Alerta className="sm:col-span-2">{errorServidor}</Alerta>
 
-        {mensajeExito && (
-          <div role="status" className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 sm:col-span-2 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
-            <Icon size={18}>{icons.check}</Icon> {mensajeExito}
-          </div>
-        )}
-
-        <Field id="nombres" label="Nombres" icon="user" error={errores.nombres}>
+        <Field id="nombres" label="Nombres" icon="user" error={errors.nombres?.message}>
           <input {...campo('nombres')} type="text" autoComplete="given-name" placeholder="Juan Carlos" />
         </Field>
 
-        <Field id="apellidos" label="Apellidos" icon="user" error={errores.apellidos}>
+        <Field id="apellidos" label="Apellidos" icon="user" error={errors.apellidos?.message}>
           <input {...campo('apellidos')} type="text" autoComplete="family-name" placeholder="Pérez López" />
         </Field>
 
-        <Field id="cedula" label="Cédula" icon="id" error={errores.cedula}>
-          <input {...campo('cedula')} type="text" inputMode="numeric" placeholder="1712345678" />
+        <Field id="cedula" label="Cédula" icon="id" error={errors.cedula?.message}>
+          <input {...campoNumerico('cedula')} type="text" placeholder="1712345678" />
         </Field>
 
-        <Field id="telefono" label="Teléfono" icon="phone" error={errores.telefono}>
-          <input {...campo('telefono')} type="tel" inputMode="numeric" autoComplete="tel" placeholder="0991234567" />
+        <Field id="telefono" label="Teléfono" icon="phone" error={errors.telefono?.message}>
+          <input {...campoNumerico('telefono')} type="tel" autoComplete="tel" placeholder="0991234567" />
         </Field>
 
         <div className="sm:col-span-2">
@@ -166,7 +145,7 @@ export default function Register() {
             id="correo"
             label="Correo institucional"
             icon="mail"
-            error={errores.correo}
+            error={errors.correo?.message}
             hint={`Solo se aceptan correos ${DOMINIO_INSTITUCIONAL}`}
           >
             <input {...campo('correo')} type="email" autoComplete="email" placeholder={`usuario${DOMINIO_INSTITUCIONAL}`} />
@@ -174,8 +153,20 @@ export default function Register() {
         </div>
 
         <div className="sm:col-span-2">
-          <Field id="facultad" label="Facultad" icon="cap" error={errores.facultad}>
-            <input {...campo('facultad')} type="text" autoComplete="organization-title" placeholder="Nombre de tu facultad" />
+          <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
+            <select {...campo('facultad')} className={`${inputClass(errors.facultad)} appearance-none pr-10`}>
+              <option value="" disabled>
+                Selecciona tu facultad
+              </option>
+              {FACULTADES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+            <Icon size={18} className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-slate-400">
+              {icons.chevron}
+            </Icon>
           </Field>
         </div>
 
@@ -183,36 +174,31 @@ export default function Register() {
           id="contrasena"
           label="Contraseña"
           icon="lock"
-          error={errores.contrasena}
+          error={errors.contrasena?.message}
           hint="Mín. 8 caracteres, con mayúscula, minúscula y número."
         >
           <PasswordInput
             id="contrasena"
-            name="contrasena"
             autoComplete="new-password"
             placeholder="••••••••"
-            value={form.contrasena}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            error={errores.contrasena}
+            error={errors.contrasena?.message}
+            {...contrasena}
+            onChange={onChangeContrasena}
           />
         </Field>
 
-        <Field id="confirmarContrasena" label="Confirmar contraseña" icon="lock" error={errores.confirmarContrasena}>
+        <Field id="confirmarContrasena" label="Confirmar contraseña" icon="lock" error={errors.confirmarContrasena?.message}>
           <PasswordInput
             id="confirmarContrasena"
-            name="confirmarContrasena"
             autoComplete="new-password"
             placeholder="••••••••"
-            value={form.confirmarContrasena}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            error={errores.confirmarContrasena}
+            error={errors.confirmarContrasena?.message}
+            {...register('confirmarContrasena', REGLAS.confirmarContrasena)}
           />
         </Field>
 
-        <button type="submit" className={`${btnPrimary} mt-2 sm:col-span-2`} disabled={cargando}>
-          {cargando ? 'Creando cuenta…' : 'Crear cuenta'}
+        <button type="submit" className={`${btnPrimary} mt-2 sm:col-span-2`} disabled={isSubmitting}>
+          {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>
       </form>
     </AuthLayout>

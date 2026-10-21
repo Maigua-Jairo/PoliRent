@@ -49,7 +49,16 @@ export const icons = {
   ),
   check: <path d="m5 12 5 5L20 7" />,
   chevron: <path d="m6 9 6 6 6-6" />,
+  logout: (
+    <>
+      <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" />
+      <path d="M16 17l5-5-5-5M21 12H9" />
+    </>
+  ),
 }
+
+export const btnSecondary =
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
 
 /* ---------- Clases reutilizables ---------- */
 export const btnPrimary =

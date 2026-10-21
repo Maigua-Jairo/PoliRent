@@ -2,24 +2,7 @@ import { Link } from 'react-router-dom'
 import { icons } from './authStyles.jsx'
 import emblem from '../../assets/images/EPN Tech Education Emblem.png'
 import ThemeToggle from '../ThemeToggle.jsx'
-
-/* ---------- Icono base (SVG inline, estilo lineal) ---------- */
-export const Icon = ({ children, size = 20, stroke = 2, className = '' }) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={stroke}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    {children}
-  </svg>
-)
+import Icon from '../Icon.jsx'
 
 /* ---------- Campo de formulario con icono y mensaje de error ---------- */
 export function Field({ id, label, icon, error, hint, children }) {
