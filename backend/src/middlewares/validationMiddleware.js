@@ -187,4 +187,80 @@ const validarIdRecurso = (req, res, next) => {
     next()
 }
 
-export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso}
+// hu009 recomendaciones
+// valida el contexto del proyecto y los datos opcionales de la recomendacion
+const validarRecomendacion = (req, res, next) => {
+    const {contexto, recursosSeleccionados, limite} = req.body
+    if(!textoValido(contexto)){
+        return res.status(400).json({msg: 'Describe el contexto de tu proyecto'})
+    }
+    if(contexto.trim().length < 5 || contexto.trim().length > 500){
+        return res.status(400).json({msg: 'El contexto debe tener entre 5 y 500 caracteres'})
+    }
+    if(recursosSeleccionados !== undefined){
+        if(!Array.isArray(recursosSeleccionados) || recursosSeleccionados.length > 10
+            || !recursosSeleccionados.every(id => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id))){
+            return res.status(400).json({msg: 'recursosSeleccionados debe ser una lista de maximo 10 ids validos'})
+        }
+    }
+    if(limite !== undefined && (!Number.isInteger(limite) || limite < 1 || limite > 10)){
+        return res.status(400).json({msg: 'El limite debe ser un numero entero entre 1 y 10'})
+    }
+    next()
+}
+
+// hu003 / hu007 prestamos
+const DIAS_MAX_PRESTAMO = 30
+
+// valida la solicitud de un prestamo
+const validarSolicitudPrestamo = (req, res, next) => {
+    const {recursoId, fechaDevolucion, motivo} = req.body
+    if(typeof recursoId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(recursoId)){
+        return res.status(400).json({msg: 'El id del recurso no es valido'})
+    }
+    if(typeof fechaDevolucion !== 'string' || Number.isNaN(Date.parse(fechaDevolucion))){
+        return res.status(400).json({msg: 'La fecha de devolucion no es valida'})
+    }
+    const fecha = new Date(fechaDevolucion)
+    const ahora = new Date()
+    if(fecha <= ahora){
+        return res.status(400).json({msg: 'La fecha de devolucion debe ser posterior a hoy'})
+    }
+    if(fecha - ahora > DIAS_MAX_PRESTAMO * 24 * 60 * 60 * 1000){
+        return res.status(400).json({msg: `El prestamo no puede superar los ${DIAS_MAX_PRESTAMO} dias`})
+    }
+    if(motivo !== undefined && (typeof motivo !== 'string' || motivo.length > 300)){
+        return res.status(400).json({msg: 'El motivo debe ser texto de maximo 300 caracteres'})
+    }
+    next()
+}
+
+// valida que el id de la ruta sea un ObjectId de MongoDB
+const validarIdPrestamo = (req, res, next) => {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)){
+        return res.status(400).json({msg: 'El id de la solicitud no es valido'})
+    }
+    next()
+}
+
+// valida el motivo (opcional) al rechazar una solicitud
+const validarRechazo = (req, res, next) => {
+    const {motivo} = req.body
+    if(motivo !== undefined && (typeof motivo !== 'string' || motivo.length > 200)){
+        return res.status(400).json({msg: 'El motivo debe ser texto de maximo 200 caracteres'})
+    }
+    next()
+}
+
+// valida el codigo leido del QR
+const validarEscaneo = (req, res, next) => {
+    const {codigo} = req.body
+    if(typeof codigo !== 'string' || !/^[0-9a-fA-F]{32}$/.test(codigo.trim())){
+        return res.status(400).json({msg: 'El codigo QR no es valido'})
+    }
+    req.body.codigo = codigo.trim()
+    next()
+}
+
+export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion,
+        validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo}

@@ -3,6 +3,8 @@ import cors from 'cors'
 import morgan from 'morgan'
 import authRouter from './routers/authRouter.js'
 import recursoRouter from './routers/recursoRouter.js'
+import recomendacionRouter from './routers/recomendacionRouter.js'
+import prestamoRouter from './routers/prestamoRouter.js'
 import {rutaNoEncontrada, manejarErrores} from './middlewares/errorHandler.js'
 
 const app = express()
@@ -20,6 +22,8 @@ app.get('/',(req, res)=>{
 })
 app.use('/api', authRouter)
 app.use('/api', recursoRouter)
+app.use('/api', recomendacionRouter)
+app.use('/api', prestamoRouter)
 
 app.use(rutaNoEncontrada)
 app.use(manejarErrores)

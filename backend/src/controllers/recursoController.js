@@ -5,7 +5,7 @@ const MSG_SIN_CLOUDINARY = 'La subida de imagenes no esta disponible: falta conf
 
 //  registrar un recurso
 const crearRecurso = async (req, res) => {
-    const {nombre, descripcion, categoria, estado, imagen} = req.body
+    const {nombre, descripcion, categoria, estado, imagen, etiquetas} = req.body
     try{
         const existe = await Recurso.findOne({nombre: nombre.trim(), categoria})
         if(existe){
@@ -22,6 +22,7 @@ const crearRecurso = async (req, res) => {
             nombre: nombre.trim(),
             descripcion: descripcion?.trim(),
             categoria,
+            etiquetas,
             estado,
             imagen: imagenSubida ? imagenSubida.url : imagen?.trim(),
             imagenId: imagenSubida?.publicId ?? null
@@ -45,7 +46,7 @@ const listarRecursos = async (req, res) => {
             if(texto){
                 // se escapan los caracteres especiales para buscar el texto literal (sin distinguir mayusculas)
                 const patron = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-                filtro.$or = [{nombre: patron}, {descripcion: patron}]
+                filtro.$or = [{nombre: patron}, {descripcion: patron}, {etiquetas: patron}]
             }
         }
         if(categoria !== undefined){
@@ -82,7 +83,7 @@ const detalleRecurso = async (req, res) => {
 
 // actualizar un recurso
 const actualizarRecurso = async (req, res) => {
-    const {nombre, descripcion, categoria, estado, imagen} = req.body
+    const {nombre, descripcion, categoria, estado, imagen, etiquetas} = req.body
     try{
         const recurso = await Recurso.findById(req.params.id)
         if(!recurso){
@@ -100,6 +101,7 @@ const actualizarRecurso = async (req, res) => {
         recurso.categoria = nuevaCategoria
         if(descripcion !== undefined) recurso.descripcion = descripcion.trim()
         if(estado !== undefined) recurso.estado = estado
+        if(etiquetas !== undefined) recurso.etiquetas = etiquetas
         // una imagen subida reemplaza a la anterior; una URL en texto solo se usa si no hay archivo
         let imagenAnteriorId = null
         if(req.file){

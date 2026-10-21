@@ -19,6 +19,11 @@ const RecursoSchema = new Schema({
         required: true,
         enum: CATEGORIAS
     },
+        // palabras clave que la IA usa para recomendar el recurso (ej. robotica, arduino, sensores)
+    etiquetas:{
+        type: [String],
+        default: []
+    },
     estado:{
         type: String,
         enum: ESTADOS,
