@@ -95,7 +95,8 @@ const actualizarPerfil = async (req, res) => {
         if(facultad !== undefined) usuarioBDD.facultad = facultad
         if(password !== undefined){
             if(!(await usuarioBDD.matchPassword(passwordActual))){
-                return res.status(401).json({msg: 'La contraseña actual es incorrecta'})
+                // 400 y no 401: la sesion sigue siendo valida, solo el dato enviado es incorrecto
+                return res.status(400).json({msg: 'La contraseña actual es incorrecta'})
             }
             usuarioBDD.password = await usuarioBDD.encryptPassword(password)
             // al cambiar la clave se cierran las demas sesiones y se entrega un token nuevo
