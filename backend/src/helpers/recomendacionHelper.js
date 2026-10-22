@@ -13,19 +13,19 @@ const PESO_RELACIONADO = 0.4
 // peso del historial de prestamos frente al parecido por texto
 const PESO_COLABORATIVO = 0.3
 
-const ETIQUETA_CATEGORIA = {tecnico: 'tecnico', academico: 'academico', recreativo: 'recreativo'}
+const ETIQUETA_CATEGORIA = { tecnico: 'tecnico', academico: 'academico', recreativo: 'recreativo' }
 
 const STOPWORDS = new Set([
-    'de','la','el','los','las','un','una','unos','unas','y','o','u','e','a','en','con','sin','por','para','que','se','su','sus',
-    'al','del','lo','es','son','mi','mis','tu','tus','como','mas','muy','ya','este','esta','estos','estas','ese','esa','hacer',
-    'proyecto','necesito','quiero','tengo','usar','uso','sobre','entre','desde','hasta','ser','hay','cual','cuales'
+    'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o', 'u', 'e', 'a', 'en', 'con', 'sin', 'por', 'para', 'que', 'se', 'su', 'sus',
+    'al', 'del', 'lo', 'es', 'son', 'mi', 'mis', 'tu', 'tus', 'como', 'mas', 'muy', 'ya', 'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'hacer',
+    'proyecto', 'necesito', 'quiero', 'tengo', 'usar', 'uso', 'sobre', 'entre', 'desde', 'hasta', 'ser', 'hay', 'cual', 'cuales'
 ])
 
 // grupos de terminos que suelen usarse juntos en un mismo proyecto (ya normalizados y sin plural)
 const GRUPOS_RELACIONADOS = [
     ['robot', 'robotica', 'arduino', 'sensor', 'servo', 'motor', 'microcontrolador', 'raspberry', 'electronica', 'circuito', 'protoboard', 'multimetro', 'soldador', 'led'],
     ['programacion', 'programar', 'software', 'codigo', 'desarrollo', 'laptop', 'portatil', 'computadora', 'monitor', 'teclado', 'mouse', 'raton'],
-    ['presentacion', 'exposicion', 'diapositiva', 'proyector', 'pantalla', 'hdmi', 'puntero', 'microfono', 'parlante', 'altavoz'],
+    ['presentacion', 'presentar', 'exposicion', 'exponer', 'sustentacion', 'sustentar', 'tesis', 'auditorio', 'conferencia', 'charla', 'diapositiva', 'proyector', 'pantalla', 'hdmi', 'puntero', 'microfono', 'parlante', 'altavoz'],
     ['red', 'router', 'switch', 'ethernet', 'cable', 'wifi', 'internet', 'conectividad'],
     ['video', 'fotografia', 'foto', 'camara', 'filmar', 'grabacion', 'tripode', 'iluminacion', 'microfono', 'edicion'],
     ['calculadora', 'matematica', 'fisica', 'quimica', 'calculo', 'formula', 'ejercicio', 'cientifica', 'libro', 'texto', 'estudio'],
@@ -37,8 +37,8 @@ const normalizar = (texto) => String(texto ?? '').toLowerCase().normalize('NFD')
 
 // quita plurales sencillos para que "sensores" y "sensor" coincidan
 const raiz = (palabra) => {
-    if(palabra.length > 4 && palabra.endsWith('es')) return palabra.slice(0, -2)
-    if(palabra.length > 3 && palabra.endsWith('s')) return palabra.slice(0, -1)
+    if (palabra.length > 4 && palabra.endsWith('es')) return palabra.slice(0, -2)
+    if (palabra.length > 3 && palabra.endsWith('s')) return palabra.slice(0, -1)
     return palabra
 }
 
@@ -51,7 +51,7 @@ const GRUPOS = GRUPOS_RELACIONADOS.map(g => new Set(g.map(t => raiz(normalizar(t
 
 // suma "peso" veces cada termino al mapa de frecuencias
 const acumular = (mapa, tokens, peso) => {
-    for(const t of tokens) mapa.set(t, (mapa.get(t) ?? 0) + peso)
+    for (const t of tokens) mapa.set(t, (mapa.get(t) ?? 0) + peso)
 }
 
 const textoRecurso = (r) => ({
@@ -84,27 +84,27 @@ const norma = (vec) => Math.sqrt([...vec.values()].reduce((s, v) => s + v * v, 0
  */
 const puntajesColaborativos = (prestamos, baseIds, usuarioId) => {
     const resultado = new Map()
-    if(!baseIds.size) return resultado
+    if (!baseIds.size) return resultado
     const porUsuario = new Map()
-    for(const p of prestamos){
+    for (const p of prestamos) {
         const u = String(p.usuario)
-        if(u === String(usuarioId)) continue
-        if(!porUsuario.has(u)) porUsuario.set(u, new Set())
+        if (u === String(usuarioId)) continue
+        if (!porUsuario.has(u)) porUsuario.set(u, new Set())
         porUsuario.get(u).add(String(p.recurso))
     }
-    for(const recursosUsuario of porUsuario.values()){
+    for (const recursosUsuario of porUsuario.values()) {
         const comunes = [...recursosUsuario].filter(r => baseIds.has(r))
-        if(!comunes.length) continue
-        for(const r of recursosUsuario){
-            if(baseIds.has(r)) continue
-            const actual = resultado.get(r) ?? {puntaje: 0, via: new Set()}
+        if (!comunes.length) continue
+        for (const r of recursosUsuario) {
+            if (baseIds.has(r)) continue
+            const actual = resultado.get(r) ?? { puntaje: 0, via: new Set() }
             actual.puntaje += comunes.length / recursosUsuario.size
             comunes.forEach(c => actual.via.add(c))
             resultado.set(r, actual)
         }
     }
     const maximo = Math.max(0, ...[...resultado.values()].map(v => v.puntaje))
-    if(maximo > 0) for(const v of resultado.values()) v.puntaje /= maximo
+    if (maximo > 0) for (const v of resultado.values()) v.puntaje /= maximo
     return resultado
 }
 
@@ -119,15 +119,15 @@ const puntajesColaborativos = (prestamos, baseIds, usuarioId) => {
  * @param {Map}    opciones.nombresBase    id -> nombre de los recursos base, para explicar la razon (opcional)
  * @returns {Array} [{recurso, relevancia (0-100, relativa al mejor resultado), terminosCoincidentes, terminosRelacionados, porHistorial, razon}]
  */
-const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite = 5, colaborativo = new Map(), nombresBase = new Map()} = {}) => {
+const recomendarRecursos = (recursos, { contexto = '', seleccionados = [], limite = 5, colaborativo = new Map(), nombresBase = new Map() } = {}) => {
     const idsSeleccionados = new Set(seleccionados.map(s => String(s._id)))
     const candidatos = recursos.filter(r => !idsSeleccionados.has(String(r._id)))
-    if(candidatos.length === 0) return []
+    if (candidatos.length === 0) return []
 
     // IDF suavizado sobre los candidatos: los terminos poco frecuentes pesan mas
     const frecuencias = candidatos.map(frecuenciasRecurso)
     const df = new Map()
-    for(const f of frecuencias) for(const t of f.keys()) df.set(t, (df.get(t) ?? 0) + 1)
+    for (const f of frecuencias) for (const t of f.keys()) df.set(t, (df.get(t) ?? 0) + 1)
     const N = candidatos.length
     const idf = (t) => Math.log((N + 1) / ((df.get(t) ?? 0) + 1)) + 1
 
@@ -135,17 +135,17 @@ const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite
     const consulta = new Map()
     const tokensContexto = tokenizar(contexto)
     acumular(consulta, tokensContexto, 1)
-    for(const s of seleccionados){
+    for (const s of seleccionados) {
         const t = textoRecurso(s)
         acumular(consulta, [...t.nombre, ...t.descripcion, ...t.etiquetas], PESO_SELECCIONADO)
     }
     const directos = new Set(consulta.keys())
     const relacionados = new Set()
-    for(const termino of directos){
-        for(const grupo of GRUPOS){
-            if(!grupo.has(termino)) continue
-            for(const otro of grupo){
-                if(!directos.has(otro)){
+    for (const termino of directos) {
+        for (const grupo of GRUPOS) {
+            if (!grupo.has(termino)) continue
+            for (const otro of grupo) {
+                if (!directos.has(otro)) {
                     consulta.set(otro, (consulta.get(otro) ?? 0) + PESO_RELACIONADO)
                     relacionados.add(otro)
                 }
@@ -156,22 +156,22 @@ const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite
     const vectorConsulta = new Map([...consulta].map(([t, f]) => [t, f * idf(t)]))
     const normaConsulta = norma(vectorConsulta)
     const hayHistorial = colaborativo.size > 0
-    if(normaConsulta === 0 && !hayHistorial) return []
+    if (normaConsulta === 0 && !hayHistorial) return []
 
     const calculados = candidatos.map((recurso, i) => {
         const vectorRecurso = new Map([...frecuencias[i]].map(([t, f]) => [t, f * idf(t)]))
         let producto = 0
         const coincidentes = []
         const relacionadosEncontrados = []
-        for(const [t, v] of vectorRecurso){
-            if(!vectorConsulta.has(t)) continue
+        for (const [t, v] of vectorRecurso) {
+            if (!vectorConsulta.has(t)) continue
             producto += v * vectorConsulta.get(t)
-            if(directos.has(t)) coincidentes.push(t)
+            if (directos.has(t)) coincidentes.push(t)
             else relacionadosEncontrados.push(t)
         }
         const normaRecurso = norma(vectorRecurso)
         const coseno = normaRecurso && normaConsulta ? producto / (normaRecurso * normaConsulta) : 0
-        return {recurso, coseno, coincidentes, relacionadosEncontrados}
+        return { recurso, coseno, coincidentes, relacionadosEncontrados }
     })
 
     // el parecido por texto se normaliza respecto al mejor candidato y se mezcla con el historial
@@ -180,7 +180,7 @@ const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite
         const historial = colaborativo.get(String(c.recurso._id))
         const contenido = maxCoseno ? c.coseno / maxCoseno : 0
         const puntaje = hayHistorial ? (1 - PESO_COLABORATIVO) * contenido + PESO_COLABORATIVO * (historial?.puntaje ?? 0) : contenido
-        return {...c, historial, puntaje}
+        return { ...c, historial, puntaje }
     })
         .filter(r => r.puntaje > 0)
         .sort((a, b) => b.puntaje - a.puntaje || String(a.recurso.nombre).localeCompare(String(b.recurso.nombre)))
@@ -188,11 +188,11 @@ const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite
 
     // la relevancia se expresa respecto al mejor resultado (el mas parecido vale 100)
     const mejor = resultados.length ? resultados[0].puntaje : 1
-    return resultados.map(({recurso, puntaje, coincidentes, relacionadosEncontrados, historial}) => {
+    return resultados.map(({ recurso, puntaje, coincidentes, relacionadosEncontrados, historial }) => {
         const razones = []
-        if(coincidentes.length) razones.push(`Coincide con tu proyecto en: ${coincidentes.join(', ')}`)
-        else if(relacionadosEncontrados.length) razones.push(`Complementa tu proyecto (relacionado con: ${relacionadosEncontrados.join(', ')})`)
-        if(historial){
+        if (coincidentes.length) razones.push(`Coincide con tu proyecto en: ${coincidentes.join(', ')}`)
+        else if (relacionadosEncontrados.length) razones.push(`Complementa tu proyecto (relacionado con: ${relacionadosEncontrados.join(', ')})`)
+        if (historial) {
             const nombres = [...historial.via].map(id => nombresBase.get(id) ?? 'un recurso similar').join(', ')
             razones.push(`Otros estudiantes que pidieron ${nombres} tambien pidieron este recurso`)
         }
@@ -207,4 +207,4 @@ const recomendarRecursos = (recursos, {contexto = '', seleccionados = [], limite
     })
 }
 
-export {recomendarRecursos, puntajesColaborativos, tokenizar}
+export { recomendarRecursos, puntajesColaborativos, tokenizar }
