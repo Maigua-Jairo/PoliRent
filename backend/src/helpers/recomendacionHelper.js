@@ -76,11 +76,11 @@ const normalizar = (texto) => String(texto ?? '').toLowerCase().normalize('NFD')
 
 // quita plurales sencillos para que "sensores" y "sensor" coincidan
 const raiz = (palabra) => {
-    if (palabra.length > 4 && palabra.endsWith('es')) return palabra.slice(0, -2)
-    if (palabra.length > 3 && palabra.endsWith('s')) return palabra.slice(0, -1)
+    if (palabra.length > 4 && palabra.endsWith('es')) palabra = palabra.slice(0, -2)
+    else if (palabra.length > 3 && palabra.endsWith('s')) palabra = palabra.slice(0, -1)
+    if (palabra.length > 3 && palabra.endsWith('e')) palabra = palabra.slice(0, -1)
     return palabra
 }
-
 const tokenizar = (texto) => normalizar(texto)
     .split(/[^a-z0-9]+/)
     .filter(p => p.length > 1 && !STOPWORDS.has(p))

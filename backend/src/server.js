@@ -9,6 +9,8 @@ import notificacionRouter from './routers/notificacionRouter.js'
 import reporteRouter from './routers/reporteRouter.js'
 import usuarioRouter from './routers/usuarioRouter.js'
 import {rutaNoEncontrada, manejarErrores} from './middlewares/errorHandler.js'
+import swaggerUi from 'swagger-ui-express'
+import especificacion from './docs/openapi.js'
 
 const app = express()
 
@@ -30,6 +32,11 @@ app.use('/api', prestamoRouter)
 app.use('/api', notificacionRouter)
 app.use('/api', reporteRouter)
 app.use('/api', usuarioRouter)
+app.get('/api-docs.json', (req, res) => res.json(especificacion))
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(especificacion, {
+    customSiteTitle: 'PoliRent API',
+    swaggerOptions: {persistAuthorization: true}
+}))
 
 app.use(rutaNoEncontrada)
 app.use(manejarErrores)
