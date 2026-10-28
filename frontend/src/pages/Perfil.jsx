@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useSearchParams } from 'react-router-dom'
 import { Field } from '../components/auth/AuthLayout.jsx'
-import { btnPrimary, icons, inputClass } from '../components/auth/authStyles.jsx'
+import { btnPrimary, btnSecondary, icons, inputClass, pestana } from '../components/auth/authStyles.jsx'
 import PasswordInput from '../components/auth/PasswordInput.jsx'
 import Alerta from '../components/Alerta.jsx'
 import Icon from '../components/Icon.jsx'
+import Avatar from '../components/Avatar.jsx'
 import {
   FACULTADES,
   regla,
@@ -27,11 +29,19 @@ const datosEditables = (u) => ({
   facultad: u?.facultad ?? '',
 })
 
-/* ---------- Ver y modificar perfil (HU-002) ---------- */
+const SECCIONES = [
+  { valor: 'perfil', etiqueta: 'Perfil' },
+  { valor: 'seguridad', etiqueta: 'Seguridad' },
+  { valor: 'notificaciones', etiqueta: 'Notificaciones' },
+]
+
+/* ---------- Configuración de cuenta: ver y modificar perfil (HU-002) ---------- */
 export default function Perfil() {
   const usuario = useAuthStore((state) => state.usuario)
   const actualizarUsuario = useAuthStore((state) => state.actualizarUsuario)
   const [errorCarga, setErrorCarga] = useState('')
+  const [params, setParams] = useSearchParams()
+  const seccion = SECCIONES.some((s) => s.valor === params.get('seccion')) ? params.get('seccion') : 'perfil'
 
   // Refresca los datos desde el backend al entrar (pueden haber cambiado en otro dispositivo)
   useEffect(() => {
@@ -41,34 +51,36 @@ export default function Perfil() {
   }, [actualizarUsuario])
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 motion-safe:animate-aparecer">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-epn-900 dark:text-white">Mi perfil</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Consulta y actualiza la información de tu cuenta.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-epn-900 dark:text-white">Configuración de cuenta</h1>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Gestiona tu información personal y preferencias.</p>
       </div>
 
       <Alerta>{errorCarga}</Alerta>
 
-      <section className={tarjeta} aria-labelledby="titulo-cuenta">
-        <h2 id="titulo-cuenta" className="text-lg font-bold text-epn-900 dark:text-white">
-          Datos de la cuenta
-        </h2>
-        <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
-          {[
-            ['Correo institucional', usuario?.correo],
-            ['Cédula', usuario?.cedula],
-            ['Rol', esAdministrador(usuario) ? 'Administrador' : 'Estudiante'],
-          ].map(([titulo, valor]) => (
-            <div key={titulo}>
-              <dt className="text-slate-500 dark:text-slate-400">{titulo}</dt>
-              <dd className="mt-1 font-semibold break-all text-slate-800 dark:text-slate-100">{valor || '—'}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Secciones de la cuenta">
+        {SECCIONES.map((s) => (
+          <button
+            key={s.valor}
+            type="button"
+            role="tab"
+            id={`pestana-${s.valor}`}
+            aria-selected={seccion === s.valor}
+            aria-controls="panel-cuenta"
+            onClick={() => setParams(s.valor === 'perfil' ? {} : { seccion: s.valor }, { replace: true })}
+            className={pestana(seccion === s.valor)}
+          >
+            {s.etiqueta}
+          </button>
+        ))}
+      </div>
 
-      <FormularioDatos usuario={usuario} onActualizado={actualizarUsuario} />
-      <FormularioClave />
+      <div id="panel-cuenta" role="tabpanel" aria-labelledby={`pestana-${seccion}`}>
+        {seccion === 'perfil' && <FormularioDatos usuario={usuario} onActualizado={actualizarUsuario} />}
+        {seccion === 'seguridad' && <FormularioClave />}
+        {seccion === 'notificaciones' && <PreferenciasNotificaciones />}
+      </div>
     </div>
   )
 }
@@ -79,6 +91,7 @@ function FormularioDatos({ usuario, onActualizado }) {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm({ mode: 'onTouched', values: datosEditables(usuario) })
   // `values` sincroniza el formulario cuando el usuario del store cambia (carga inicial o guardado)
@@ -106,38 +119,75 @@ function FormularioDatos({ usuario, onActualizado }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className={tarjeta} aria-labelledby="titulo-datos">
       <h2 id="titulo-datos" className="text-lg font-bold text-epn-900 dark:text-white">
-        Datos personales
+        Información personal
       </h2>
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <Alerta className="sm:col-span-2">{errorServidor}</Alerta>
-        <Alerta tipo="exito" className="sm:col-span-2">{mensajeExito}</Alerta>
+      <div className="mt-5 grid gap-8 md:grid-cols-[minmax(0,1fr)_14rem]">
+        <div className="grid content-start gap-5 sm:grid-cols-2">
+          <Alerta className="sm:col-span-2">{errorServidor}</Alerta>
+          <Alerta tipo="exito" className="sm:col-span-2">{mensajeExito}</Alerta>
 
-        <Field id="nombres" label="Nombres" icon="user" error={errors.nombres?.message}>
-          <input {...campo('nombres', (v) => validarNombre(v, 'El nombre'))} type="text" autoComplete="given-name" />
-        </Field>
-        <Field id="apellidos" label="Apellidos" icon="user" error={errors.apellidos?.message}>
-          <input {...campo('apellidos', (v) => validarNombre(v, 'El apellido'))} type="text" autoComplete="family-name" />
-        </Field>
-        <Field id="telefono" label="Teléfono" icon="phone" error={errors.telefono?.message}>
-          <input {...campo('telefono', validarTelefono)} type="tel" inputMode="numeric" maxLength={10} autoComplete="tel" />
-        </Field>
-        <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
-          <select {...campo('facultad', validarFacultad)} className={inputClass(errors.facultad, true, true)}>
-            <option value="" disabled>
-              Selecciona tu facultad
-            </option>
-            {FACULTADES.map((f) => (
-              <option key={f} value={f}>
-                {f}
+          <Field id="nombres" label="Nombres" icon="user" error={errors.nombres?.message}>
+            <input {...campo('nombres', (v) => validarNombre(v, 'El nombre'))} type="text" autoComplete="given-name" />
+          </Field>
+          <Field id="apellidos" label="Apellidos" icon="user" error={errors.apellidos?.message}>
+            <input {...campo('apellidos', (v) => validarNombre(v, 'El apellido'))} type="text" autoComplete="family-name" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field id="correo" label="Correo electrónico" icon="mail" hint="El correo institucional no se puede modificar.">
+              <input
+                id="correo"
+                type="email"
+                value={usuario?.correo ?? ''}
+                readOnly
+                className={`${inputClass(false)} cursor-not-allowed bg-slate-50! text-slate-500! dark:bg-slate-800/60! dark:text-slate-400!`}
+              />
+            </Field>
+          </div>
+          <Field id="telefono" label="Teléfono" icon="phone" error={errors.telefono?.message}>
+            <input {...campo('telefono', validarTelefono)} type="tel" inputMode="numeric" maxLength={10} autoComplete="tel" />
+          </Field>
+          <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
+            <select {...campo('facultad', validarFacultad)} className={inputClass(errors.facultad, true, true)}>
+              <option value="" disabled>
+                Selecciona tu facultad
               </option>
+              {FACULTADES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+            <Icon size={18} className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-slate-400">
+              {icons.chevron}
+            </Icon>
+          </Field>
+        </div>
+
+        <aside className="order-first flex flex-col items-center gap-4 md:order-none">
+          <div className="grid h-36 w-36 place-items-center rounded-2xl bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+            <Avatar usuario={usuario} tamano="xl" />
+          </div>
+          {/* Provisional: el backend aún no guarda la foto de perfil */}
+          <button type="button" disabled title="Disponible próximamente" className={`${btnSecondary} cursor-not-allowed opacity-60`}>
+            Cambiar foto
+          </button>
+          <dl className="w-full space-y-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/60">
+            {[
+              ['Cédula', usuario?.cedula],
+              ['Rol', esAdministrador(usuario) ? 'Administrador' : 'Estudiante'],
+            ].map(([titulo, valor]) => (
+              <div key={titulo}>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">{titulo}</dt>
+                <dd className="font-semibold break-all text-slate-800 dark:text-slate-100">{valor || '—'}</dd>
+              </div>
             ))}
-          </select>
-          <Icon size={18} className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-slate-400">
-            {icons.chevron}
-          </Icon>
-        </Field>
+          </dl>
+        </aside>
       </div>
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end dark:border-slate-800">
+        <button type="button" onClick={() => reset()} disabled={isSubmitting || !isDirty} className={`${btnSecondary} disabled:opacity-50`}>
+          Cancelar
+        </button>
         <button type="submit" className={btnGuardar} disabled={isSubmitting || !isDirty}>
           {isSubmitting ? 'Guardando…' : 'Guardar cambios'}
         </button>
@@ -228,5 +278,31 @@ function FormularioClave() {
         </button>
       </div>
     </form>
+  )
+}
+
+/* ---------- Preferencias de notificaciones (provisional: aún no existen en el backend) ---------- */
+function PreferenciasNotificaciones() {
+  const opciones = [
+    'Avisarme por correo cuando cambie el estado de una solicitud.',
+    'Recordarme un día antes de la fecha de devolución.',
+  ]
+  return (
+    <section className={tarjeta} aria-labelledby="titulo-notificaciones">
+      <h2 id="titulo-notificaciones" className="text-lg font-bold text-epn-900 dark:text-white">
+        Notificaciones
+      </h2>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Estas preferencias estarán disponibles próximamente.</p>
+      <ul className="mt-5 space-y-3">
+        {opciones.map((opcion) => (
+          <li key={opcion}>
+            <label className="flex cursor-not-allowed items-start gap-3 text-sm text-slate-500 dark:text-slate-400">
+              <input type="checkbox" disabled defaultChecked className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-brand-500" />
+              {opcion}
+            </label>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

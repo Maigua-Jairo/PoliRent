@@ -7,6 +7,8 @@ export const CATEGORIAS = [
     descripcion: 'Herramientas, equipos electrónicos y kits de laboratorio para tus prácticas y proyectos.',
     tono: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
     acento: 'from-blue-500/25',
+    // color de la categoría en gráficos (paleta validada para claro y oscuro)
+    grafico: 'text-brand-500',
     icono: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
   },
   {
@@ -16,6 +18,7 @@ export const CATEGORIAS = [
     descripcion: 'Material bibliográfico y recursos de apoyo para tus asignaturas e investigaciones.',
     tono: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
     acento: 'from-emerald-500/25',
+    grafico: 'text-emerald-500 dark:text-emerald-600',
     icono: (
       <>
         <path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z" />
@@ -30,6 +33,7 @@ export const CATEGORIAS = [
     descripcion: 'Implementos deportivos y de ocio para actividades extracurriculares.',
     tono: 'bg-orange-100 text-orange-500 dark:bg-orange-500/15 dark:text-orange-400',
     acento: 'from-orange-500/25',
+    grafico: 'text-orange-500 dark:text-orange-600',
     icono: (
       <>
         <circle cx="12" cy="12" r="9" />

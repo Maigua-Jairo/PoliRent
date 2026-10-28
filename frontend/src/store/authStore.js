@@ -17,3 +17,6 @@ export const useAuthStore = create(
 )
 
 export const esAdministrador = (usuario) => usuario?.rol === 'administrador'
+
+// Pantalla a la que llega cada rol al iniciar sesión
+export const rutaInicio = (usuario) => (esAdministrador(usuario) ? '/admin' : '/dashboard')

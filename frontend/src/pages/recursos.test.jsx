@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import Catalogo from './Catalogo.jsx'
+import CatalogoRecursos from '../components/recursos/CatalogoRecursos.jsx'
 import GestionRecursos from './admin/GestionRecursos.jsx'
 import FormularioRecurso from './admin/FormularioRecurso.jsx'
 import RutaProtegida from '../components/routes/RutaProtegida.jsx'
@@ -27,7 +27,7 @@ const renderEn = (ruta) =>
       <Routes>
         <Route path="/" element={<p>Inicio</p>} />
         <Route path="/login" element={<p>Login</p>} />
-        <Route path="/recursos" element={<Catalogo />} />
+        <Route path="/recursos" element={<CatalogoRecursos />} />
         <Route element={<RutaProtegida roles={['administrador']} />}>
           <Route path="/admin/recursos" element={<GestionRecursos />} />
           <Route path="/admin/recursos/nuevo" element={<FormularioRecurso />} />

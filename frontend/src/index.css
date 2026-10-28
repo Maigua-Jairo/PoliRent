@@ -28,6 +28,12 @@
   }
 }
 
+/* Barra de desplazamiento fina para zonas oscuras (barra lateral del panel) */
+@utility scroll-fino {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

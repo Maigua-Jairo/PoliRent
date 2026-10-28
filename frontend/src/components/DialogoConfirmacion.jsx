@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { btnSecondary } from './auth/authStyles.jsx'
 
 /* ---------- Diálogo modal de confirmación (Escape o clic fuera cancela) ---------- */
-export default function DialogoConfirmacion({ abierto, titulo, children, textoConfirmar = 'Confirmar', procesando, onConfirmar, onCancelar }) {
+export default function DialogoConfirmacion({ abierto, titulo, children, textoConfirmar = 'Confirmar', textoCancelar = 'Cancelar', procesando, onConfirmar, onCancelar }) {
   const botonCancelar = useRef(null)
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function DialogoConfirmacion({ abierto, titulo, children, textoCo
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button ref={botonCancelar} type="button" onClick={onCancelar} disabled={procesando} className={btnSecondary}>
-            Cancelar
+            {textoCancelar}
           </button>
           <button
             type="button"

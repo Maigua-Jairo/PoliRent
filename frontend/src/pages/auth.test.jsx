@@ -19,6 +19,7 @@ const renderEn = (ruta, elemento) =>
       <Routes>
         <Route path={ruta} element={elemento} />
         <Route path="/" element={<p>Página de inicio</p>} />
+        <Route path="/dashboard" element={<p>Panel del estudiante</p>} />
         <Route path="/login" element={<Login />} />
       </Routes>
     </MemoryRouter>,
@@ -39,7 +40,7 @@ describe('Login', () => {
     expect(authService.iniciarSesion).not.toHaveBeenCalled()
   })
 
-  test('guarda la sesión y redirige al inicio', async () => {
+  test('guarda la sesión y redirige al panel del estudiante', async () => {
     const usuario = { id: '1', nombres: 'Juan', rol: 'estudiante' }
     authService.iniciarSesion.mockResolvedValue({ token: 'jwt-123', usuario })
     renderEn('/login', <Login />)
@@ -48,7 +49,7 @@ describe('Login', () => {
     await userEvent.type(screen.getByLabelText('Contraseña'), 'Clave1234')
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
-    expect(await screen.findByText('Página de inicio')).toBeInTheDocument()
+    expect(await screen.findByText('Panel del estudiante')).toBeInTheDocument()
     expect(authService.iniciarSesion).toHaveBeenCalledWith({ correo: 'juan.perez@epn.edu.ec', password: 'Clave1234' })
     expect(useAuthStore.getState()).toMatchObject({ token: 'jwt-123', usuario })
   })

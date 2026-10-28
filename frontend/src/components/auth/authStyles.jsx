@@ -48,6 +48,12 @@ export const icons = {
     </>
   ),
   check: <path d="m5 12 5 5L20 7" />,
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4M8 3v4M3 11h18" />
+    </>
+  ),
   chevron: <path d="m6 9 6 6 6-6" />,
   logout: (
     <>
@@ -75,4 +81,12 @@ export const inputClass = (error, conIcono = true, conFlecha = false) =>
     error
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15'
       : 'border-slate-300 focus:border-brand-500 focus:ring-brand-500/15 dark:border-slate-700'
+  }`
+
+/* ---------- Pestaña tipo píldora (filtros por estado, secciones de la cuenta) ---------- */
+export const pestana = (activa) =>
+  `shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+    activa
+      ? 'bg-epn-900 text-white shadow-sm dark:bg-brand-500'
+      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
   }`

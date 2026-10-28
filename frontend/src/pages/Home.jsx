@@ -1,10 +1,9 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import ThemeToggle from '../components/ThemeToggle.jsx'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
-import SesionUsuario from '../components/SesionUsuario.jsx'
+import NavbarSitio, { container, Logo } from '../components/layout/NavbarSitio.jsx'
+import CatalogoRecursos from '../components/recursos/CatalogoRecursos.jsx'
 import { useAuthStore } from '../store/authStore.js'
-import { CATEGORIAS } from '../utils/recursos.jsx'
 
 /* ---------- Iconos propios de la landing ---------- */
 const icons = {
@@ -86,8 +85,6 @@ const icons = {
       <path d="M10 17l5-5-5-5M15 12H3" />
     </>
   ),
-  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
-  close: <path d="M6 6l12 12M18 6 6 18" />,
 }
 
 const SOCIAL_PATHS = {
@@ -102,22 +99,6 @@ const SOCIAL_PATHS = {
     'M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.5h4V21H3zM9.5 9.5h3.8v1.6h.1c.5-1 1.8-2 3.8-2 4 0 4.8 2.6 4.8 6V21h-4v-5.1c0-1.2 0-2.8-1.7-2.8s-2 1.3-2 2.7V21h-4z',
 }
 
-/* ---------- Logo ---------- */
-const Logo = ({ light = false }) => (
-  <a href="#inicio" className="flex shrink-0 items-center gap-2.5">
-    <span className={`text-2xl font-extrabold tracking-tight ${light ? 'text-white' : 'text-epn-900 dark:text-white'}`}>
-      PoliRent
-    </span>
-    <span
-      className={`ml-2 hidden text-[11px] leading-tight sm:block ${light ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}
-    >
-      Escuela Politécnica
-      <br />
-      Nacional
-    </span>
-  </a>
-)
-
 /* ---------- Clases reutilizables ---------- */
 const btn =
   'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500'
@@ -126,14 +107,6 @@ const btnOutline = `${btn} border border-brand-500 text-brand-600 hover:bg-brand
 const btnGhost = `${btn} border border-white/40 text-white hover:bg-white/10`
 
 /* ---------- Datos ---------- */
-const NAV_LINKS = [
-  { href: '#inicio', label: 'Inicio' },
-  { href: '#recursos', label: 'Recursos' },
-  { href: '#como-funciona', label: 'Préstamos' },
-  { href: '#recomendaciones', label: 'Recomendaciones' },
-  { href: '#contacto', label: 'Contacto' },
-]
-
 const FEATURES = [
   {
     icon: 'laptop',
@@ -174,97 +147,20 @@ const STEPS = [
   { icon: 'checkCircle', title: 'Devuelve', text: 'Finaliza el proceso y ayuda a otros estudiantes.' },
 ]
 
-const container = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10'
-
 /* ---------- Componente ---------- */
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const { hash } = useLocation()
   const autenticado = useAuthStore((state) => Boolean(state.token))
+  const esEstudiante = useAuthStore((state) => Boolean(state.token) && state.usuario?.rol === 'estudiante')
+
+  // Al llegar desde otra página con /#seccion (navbar, "Volver al catálogo", buscador del panel)
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: 'start' })
+  }, [hash])
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* NAVBAR */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-        <div className={`${container} flex h-16 items-center justify-between gap-6`}>
-          <Logo />
-
-          <nav className="hidden h-full items-center gap-8 lg:flex">
-            {NAV_LINKS.map((link, i) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={`relative flex h-full items-center text-sm font-semibold transition-colors ${
-                  i === 0
-                    ? 'text-brand-600 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-brand-500 dark:text-brand-400'
-                    : 'text-slate-800 hover:text-brand-600 dark:text-slate-200 dark:hover:text-brand-400'
-                }`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="hidden items-center gap-4 lg:flex">
-            {autenticado ? (
-              <SesionUsuario />
-            ) : (
-              <>
-                <Link to="/login" className={`${btnOutline} px-5 py-2.5 text-sm`}>
-                  Iniciar sesión
-                </Link>
-                <Link to="/registro" className={`${btnPrimary} px-5 py-2.5 text-sm`}>
-                  Registrarse
-                </Link>
-              </>
-            )}
-            <ThemeToggle />
-          </div>
-
-          <div className="flex items-center gap-1 lg:hidden">
-            <ThemeToggle />
-            <button
-              className="rounded-lg p-2 text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <Icon size={24}>{menuOpen ? icons.close : icons.menu}</Icon>
-            </button>
-          </div>
-        </div>
-
-        {/* Menú móvil */}
-        {menuOpen && (
-          <nav className="border-t border-slate-200 bg-white lg:hidden dark:border-slate-800 dark:bg-slate-900">
-            <div className={`${container} flex flex-col gap-1 py-4`}>
-              {NAV_LINKS.map((link, i) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
-                    i === 0 ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {link.label}
-                </a>
-              ))}
-              {autenticado ? (
-                <SesionUsuario className="mt-3 justify-between" />
-              ) : (
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Link to="/login" className={`${btnOutline} py-2.5 text-sm`}>
-                    Iniciar sesión
-                  </Link>
-                  <Link to="/registro" className={`${btnPrimary} py-2.5 text-sm`}>
-                    Registrarse
-                  </Link>
-                </div>
-              )}
-            </div>
-          </nav>
-        )}
-      </header>
+      <NavbarSitio />
 
       <main>
         {/* HERO */}
@@ -294,9 +190,10 @@ export default function Home() {
                 <Link to={autenticado ? '/perfil' : '/registro'} className={`${btnPrimary} px-6 py-3`}>
                   Comenzar ahora <Icon size={18}>{icons.arrow}</Icon>
                 </Link>
-                <Link to="/recursos" className={`${btnGhost} px-6 py-3`}>
+                {/* Baja a la sección "Recursos" de esta misma página (la del menú superior) */}
+                <a href="#recursos" className={`${btnGhost} px-6 py-3`}>
                   Explorar recursos <Icon size={18}>{icons.search}</Icon>
-                </Link>
+                </a>
               </div>
             </div>
 
@@ -350,31 +247,16 @@ export default function Home() {
           </div>
         </section>
 
-        {/* RECURSOS POR CATEGORÍA */}
-        <section id="recursos" className="scroll-mt-16 pb-10">
+        {/* RECURSOS: catálogo completo del backend */}
+        <section id="recursos" aria-labelledby="titulo-recursos" className="scroll-mt-16 py-10">
           <div className={container}>
-            <h2 className="text-2xl font-extrabold text-epn-900 dark:text-white">Recursos por categoría</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Las asociaciones estudiantiles ponen a tu disposición tres tipos de recursos.
+            <h2 id="titulo-recursos" className="text-2xl font-extrabold text-epn-900 dark:text-white">
+              Recursos
+            </h2>
+            <p className="mt-2 mb-6 text-sm text-slate-600 dark:text-slate-400">
+              Recursos técnicos, académicos y recreativos de las asociaciones estudiantiles, con su disponibilidad en tiempo real.
             </p>
-            <div className="mt-6 grid gap-5 md:grid-cols-3">
-              {CATEGORIAS.map((c) => (
-                <Link
-                  key={c.valor}
-                  to={`/recursos?categoria=${c.valor}`}
-                  className="group rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand-500/40 dark:bg-slate-900 dark:ring-slate-800"
-                >
-                  <div className={`grid h-12 w-12 place-items-center rounded-xl ${c.tono}`}>
-                    <Icon size={26} stroke={1.8}>{c.icono}</Icon>
-                  </div>
-                  <h3 className="mt-4 text-lg font-bold text-epn-900 dark:text-white">{c.plural}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{c.descripcion}</p>
-                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 dark:text-brand-400">
-                    Ver recursos <Icon size={16} className="transition-transform group-hover:translate-x-1">{icons.arrow}</Icon>
-                  </span>
-                </Link>
-              ))}
-            </div>
+            <CatalogoRecursos />
           </div>
         </section>
 
@@ -462,6 +344,24 @@ export default function Home() {
                   Describe tu proyecto académico o práctica y el sistema te sugerirá recursos similares o
                   complementarios disponibles en las asociaciones, para que no se te escape ninguna herramienta útil.
                 </p>
+                {esEstudiante ? (
+                  <Link to="/recomendaciones" className={`${btnOutline} mt-4 px-5 py-2 text-sm`}>
+                    Probar recomendaciones <Icon size={16}>{icons.arrow}</Icon>
+                  </Link>
+                ) : (
+                  !autenticado && (
+                  <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+                    <Link to="/login" className="font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                      Inicia sesión
+                    </Link>{' '}
+                    o{' '}
+                    <Link to="/registro" className="font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                      regístrate
+                    </Link>{' '}
+                    para recibir recomendaciones y reservar recursos.
+                  </p>
+                  )
+                )}
               </div>
             </div>
           </div>

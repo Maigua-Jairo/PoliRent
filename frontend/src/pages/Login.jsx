@@ -7,7 +7,7 @@ import PasswordInput from '../components/auth/PasswordInput.jsx'
 import Alerta from '../components/Alerta.jsx'
 import { DOMINIO_INSTITUCIONAL, regla, validarCorreoEPN } from '../utils/validaciones.js'
 import { iniciarSesion, obtenerMensajeError } from '../services/authService.js'
-import { useAuthStore } from '../store/authStore.js'
+import { rutaInicio, useAuthStore } from '../store/authStore.js'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -32,7 +32,7 @@ export default function Login() {
         return
       }
       guardarSesion({ token: respuesta.token, usuario: respuesta.usuario })
-      navigate(location.state?.desde || '/', { replace: true })
+      navigate(location.state?.desde || rutaInicio(respuesta.usuario), { replace: true })
     } catch (error) {
       setErrorServidor(obtenerMensajeError(error))
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
+import FormularioSolicitud from '../components/prestamos/FormularioSolicitud.jsx'
 import Alerta from '../components/Alerta.jsx'
 import Icon from '../components/Icon.jsx'
 import EtiquetaEstado from '../components/recursos/EtiquetaEstado.jsx'
@@ -12,9 +13,40 @@ import { buscarCategoria } from '../utils/recursos.jsx'
 
 const fecha = (iso) => (iso ? new Date(iso).toLocaleDateString('es-EC', { dateStyle: 'long' }) : '—')
 
+/* ---------- Bloque de reserva: formulario, aviso de no disponible o acceso para invitados ---------- */
+function Reserva({ recurso, conSesion }) {
+  const location = useLocation()
+  if (!conSesion) {
+    return (
+      <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+        <p>Para reservar este recurso inicia sesión con tu cuenta institucional o regístrate si aún no tienes una.</p>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/login" state={{ desde: `${location.pathname}#solicitar` }} className={btnSecondary}>
+            Iniciar sesión
+          </Link>
+          <Link to="/registro" className={`${btnSecondary} border-brand-500 text-brand-600 dark:text-brand-400`}>
+            Registrarse
+          </Link>
+        </div>
+      </div>
+    )
+  }
+  if (recurso.estado !== 'disponible') {
+    return (
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        Este recurso no está disponible en este momento
+        {recurso.estado === 'mantenimiento' ? ' porque está en mantenimiento' : ' porque está prestado'}. Vuelve a consultarlo más tarde.
+      </p>
+    )
+  }
+  return <FormularioSolicitud recurso={recurso} />
+}
+
 /* ---------- Detalle de un recurso del catálogo ---------- */
 export default function DetalleRecurso() {
   const { id } = useParams()
+  const { hash } = useLocation()
+  const token = useAuthStore((state) => state.token)
   const usuario = useAuthStore((state) => state.usuario)
   const [{ recurso, error }, setResultado] = useState({ recurso: null, error: '' })
 
@@ -28,8 +60,13 @@ export default function DetalleRecurso() {
     }
   }, [id])
 
+  // "Reservar" desde las recomendaciones llega con #solicitar
+  useEffect(() => {
+    if (recurso && hash === '#solicitar') document.getElementById('solicitar')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }, [recurso, hash])
+
   const volver = (
-    <Link to="/recursos" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400">
+    <Link to="/#recursos" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400">
       <Icon size={18}>{icons.back}</Icon> Volver al catálogo
     </Link>
   )
@@ -83,11 +120,19 @@ export default function DetalleRecurso() {
               <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">{fecha(recurso.updatedAt)}</dd>
             </div>
           </dl>
-          {/* La solicitud de préstamo llega con HU-008 */}
           {esAdministrador(usuario) && (
             <Link to={`/admin/recursos/${recurso._id}/editar`} className={`${btnSecondary} mt-6`}>
               Editar recurso
             </Link>
+          )}
+          {!esAdministrador(usuario) && (
+            <section
+              id="solicitar"
+              aria-label="Reserva del recurso"
+              className="mt-6 scroll-mt-24 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+            >
+              <Reserva recurso={recurso} conSesion={Boolean(token)} />
+            </section>
           )}
         </div>
       </article>
