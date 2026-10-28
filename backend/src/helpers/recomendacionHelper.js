@@ -23,14 +23,53 @@ const STOPWORDS = new Set([
 
 // grupos de terminos que suelen usarse juntos en un mismo proyecto (ya normalizados y sin plural)
 const GRUPOS_RELACIONADOS = [
-    ['robot', 'robotica', 'arduino', 'sensor', 'servo', 'motor', 'microcontrolador', 'raspberry', 'electronica', 'circuito', 'protoboard', 'multimetro', 'soldador', 'led'],
-    ['programacion', 'programar', 'software', 'codigo', 'desarrollo', 'laptop', 'portatil', 'computadora', 'monitor', 'teclado', 'mouse', 'raton'],
-    ['presentacion', 'presentar', 'exposicion', 'exponer', 'sustentacion', 'sustentar', 'tesis', 'auditorio', 'conferencia', 'charla', 'diapositiva', 'proyector', 'pantalla', 'hdmi', 'puntero', 'microfono', 'parlante', 'altavoz'],
-    ['red', 'router', 'switch', 'ethernet', 'cable', 'wifi', 'internet', 'conectividad'],
-    ['video', 'fotografia', 'foto', 'camara', 'filmar', 'grabacion', 'tripode', 'iluminacion', 'microfono', 'edicion'],
-    ['calculadora', 'matematica', 'fisica', 'quimica', 'calculo', 'formula', 'ejercicio', 'cientifica', 'libro', 'texto', 'estudio'],
-    ['impresora', 'impresion', '3d', 'filamento', 'prototipo', 'maqueta', 'diseño'],
-    ['juego', 'ajedrez', 'domino', 'carta', 'mesa', 'recreacion', 'balon', 'futbol', 'deporte', 'cancha', 'torneo', 'evento']
+    // robotica y electronica
+    ['robot', 'robotica', 'arduino', 'sensor', 'servo', 'motor', 'microcontrolador', 'raspberry', 'electronica', 'circuito', 'protoboard', 'multimetro', 'soldador', 'led',
+        'esp32', 'jumper', 'resistencia', 'transistor', 'capacitor', 'relay', 'rele', 'driver', 'pcb', 'estaño', 'cautin', 'seguidor', 'minisumo', 'sumo', 'automatizacion', 'iot', 'domotica'],
+    // programacion y computo
+    ['programacion', 'programar', 'software', 'codigo', 'desarrollo', 'laptop', 'portatil', 'computadora', 'monitor', 'teclado', 'mouse', 'raton',
+        'python', 'java', 'javascript', 'app', 'aplicacion', 'web', 'hackathon', 'servidor', 'tablet', 'disco', 'usb', 'pendrive', 'cargador'],
+    // ciencia de datos e inteligencia artificial
+    ['datos', 'inteligencia', 'artificial', 'ia', 'machine', 'learning', 'modelo', 'entrenamiento', 'gpu', 'servidor', 'nube', 'python', 'estadistica', 'analisis'],
+    // presentaciones y eventos academicos
+    ['presentacion', 'presentar', 'exposicion', 'exponer', 'sustentacion', 'sustentar', 'tesis', 'auditorio', 'conferencia', 'charla', 'diapositiva', 'proyector', 'pantalla', 'hdmi', 'puntero', 'microfono', 'parlante', 'altavoz',
+        'adaptador', 'clicker', 'atril', 'congreso', 'seminario', 'ponencia', 'webinar', 'taller', 'capacitacion'],
+    // audio y sonido
+    ['audio', 'sonido', 'microfono', 'parlante', 'altavoz', 'bocina', 'amplificador', 'mezclador', 'consola', 'audifono', 'auricular', 'musica', 'dj', 'megafono', 'podcast'],
+    // redes y conectividad
+    ['red', 'router', 'switch', 'ethernet', 'cable', 'wifi', 'internet', 'conectividad', 'cisco', 'rj45', 'ponchadora', 'servidor', 'ciberseguridad'],
+    // fotografia, video y transmision
+    ['video', 'fotografia', 'foto', 'camara', 'filmar', 'grabacion', 'tripode', 'iluminacion', 'microfono', 'edicion',
+        'lente', 'flash', 'estabilizador', 'gimbal', 'softbox', 'croma', 'streaming', 'transmision', 'webcam', 'memoria', 'sd', 'cortometraje', 'documental'],
+    // estudio y ciencias basicas
+    ['calculadora', 'matematica', 'fisica', 'quimica', 'calculo', 'formula', 'ejercicio', 'cientifica', 'libro', 'texto', 'estudio',
+        'algebra', 'estadistica', 'ecuacion', 'graficadora', 'tutoria', 'examen', 'deber', 'investigacion', 'diccionario', 'enciclopedia'],
+    // laboratorio quimico y biologico
+    ['laboratorio', 'microscopio', 'balanza', 'probeta', 'matraz', 'pipeta', 'reactivo', 'quimica', 'biologia', 'bata', 'guante', 'experimento', 'ph', 'termometro'],
+    // electrica y energia
+    ['electrica', 'energia', 'fuente', 'bateria', 'voltaje', 'corriente', 'osciloscopio', 'generador', 'inversor', 'solar', 'transformador', 'multimetro', 'extension', 'regleta'],
+    // taller mecanico y herramientas
+    ['mecanica', 'herramienta', 'taladro', 'destornillador', 'alicate', 'sierra', 'martillo', 'calibrador', 'flexometro', 'lija', 'torno', 'llave', 'pegamento', 'silicona', 'taller'],
+    // fabricacion digital y prototipado
+    ['impresora', 'impresion', '3d', 'filamento', 'prototipo', 'maqueta', 'diseño',
+        'cnc', 'laser', 'corte', 'modelado', 'escaner', 'cad', 'autocad', 'solidworks', 'resina', 'pla'],
+    // ingenieria civil y topografia
+    ['civil', 'topografia', 'teodolito', 'gps', 'plano', 'construccion', 'estructura', 'hormigon', 'flexometro', 'autocad', 'casco', 'chaleco'],
+    // salidas de campo (geologia, ambiental)
+    ['campo', 'salida', 'excursion', 'geologia', 'ambiental', 'brujula', 'gps', 'mochila', 'linterna', 'carpa', 'casco', 'botiquin'],
+    // drones y aeromodelismo
+    ['dron', 'drone', 'aeromodelismo', 'vuelo', 'helice', 'bateria', 'aerea', 'mapeo', 'camara'],
+    // videojuegos y realidad virtual
+    ['videojuego', 'gaming', 'gamer', 'esport', 'consola', 'mando', 'joystick', 'vr', 'virtual', 'realidad', 'oculus', 'simulador', 'pantalla'],
+    // juegos de mesa y deportes
+    ['juego', 'ajedrez', 'domino', 'carta', 'mesa', 'recreacion', 'balon', 'futbol', 'deporte', 'cancha', 'torneo', 'evento',
+        'voley', 'voleibol', 'basquet', 'baloncesto', 'pingpong', 'tenis', 'raqueta', 'cronometro', 'silbato', 'cono', 'chaleco', 'uniforme', 'campeonato', 'olimpiada'],
+    // logistica de eventos de la asociacion
+    ['evento', 'feria', 'stand', 'carpa', 'toldo', 'silla', 'mesa', 'banner', 'letrero', 'decoracion', 'casa', 'abierta', 'bienvenida', 'integracion', 'inscripcion', 'extension'],
+    // emprendimiento y gestion
+    ['emprendimiento', 'negocio', 'startup', 'pitch', 'marketing', 'publicidad', 'feria', 'stand', 'concurso', 'innovacion'],
+    // talleres y trabajo en grupo
+    ['pizarra', 'marcador', 'papelografo', 'rotafolio', 'borrador', 'tiza', 'taller', 'curso', 'capacitacion', 'reunion']
 ]
 
 const normalizar = (texto) => String(texto ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')

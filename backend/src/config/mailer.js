@@ -45,4 +45,23 @@ const enviarCorreoRecuperacion = async ({correo, nombres}, token) => {
     })
 }
 
-export {correoConfigurado, enviarCorreoRecuperacion}
+// envia al correo institucional el aviso de una notificacion del sistema (HU-010)
+const enviarCorreoNotificacion = async ({correo, nombres}, asunto, mensaje) => {
+    await obtenerTransportador().sendMail({
+        from: process.env.MAIL_FROM || `PoliRent <${process.env.SMTP_USER}>`,
+        to: correo,
+        subject: `PoliRent - ${asunto}`,
+        text: `Hola ${nombres},\n\n${mensaje}\n\nIngresa a ${urlFrontend()} para ver el detalle.`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1e293b">
+                <h2 style="color:#0b2447">${asunto}</h2>
+                <p>Hola ${nombres},</p>
+                <p>${mensaje}</p>
+                <p style="text-align:center;margin:28px 0">
+                    <a href="${urlFrontend()}" style="background:#1677ff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Abrir PoliRent</a>
+                </p>
+            </div>`
+    })
+}
+
+export {correoConfigurado, enviarCorreoRecuperacion, enviarCorreoNotificacion}

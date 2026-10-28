@@ -5,6 +5,9 @@ import authRouter from './routers/authRouter.js'
 import recursoRouter from './routers/recursoRouter.js'
 import recomendacionRouter from './routers/recomendacionRouter.js'
 import prestamoRouter from './routers/prestamoRouter.js'
+import notificacionRouter from './routers/notificacionRouter.js'
+import reporteRouter from './routers/reporteRouter.js'
+import usuarioRouter from './routers/usuarioRouter.js'
 import {rutaNoEncontrada, manejarErrores} from './middlewares/errorHandler.js'
 
 const app = express()
@@ -24,6 +27,9 @@ app.use('/api', authRouter)
 app.use('/api', recursoRouter)
 app.use('/api', recomendacionRouter)
 app.use('/api', prestamoRouter)
+app.use('/api', notificacionRouter)
+app.use('/api', reporteRouter)
+app.use('/api', usuarioRouter)
 
 app.use(rutaNoEncontrada)
 app.use(manejarErrores)

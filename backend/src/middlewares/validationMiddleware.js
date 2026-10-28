@@ -1,4 +1,5 @@
 import {FACULTADES} from '../models/Usuario.js'
+import {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(\s[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*$/
@@ -262,5 +263,63 @@ const validarEscaneo = (req, res, next) => {
     next()
 }
 
+// hu004 / hu008 / hu010 reportes, historial y notificaciones
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
+const fechaReal = (texto) => typeof texto === 'string' && FECHA_ISO.test(texto) && !Number.isNaN(Date.parse(texto))
+    && new Date(texto).toISOString().startsWith(texto)
+
+// valida ?estado ?desde ?hasta (AAAA-MM-DD) y ?formato=json|csv
+const validarFiltrosReporte = (req, res, next) => {
+    const {estado, desde, hasta, formato} = req.query
+    if(estado !== undefined && (typeof estado !== 'string' || !ESTADOS_PRESTAMO.includes(estado))){
+        return res.status(400).json({msg: 'Estado no valido'})
+    }
+    if(desde !== undefined && !fechaReal(desde)){
+        return res.status(400).json({msg: 'La fecha "desde" debe tener el formato AAAA-MM-DD'})
+    }
+    if(hasta !== undefined && !fechaReal(hasta)){
+        return res.status(400).json({msg: 'La fecha "hasta" debe tener el formato AAAA-MM-DD'})
+    }
+    if(desde !== undefined && hasta !== undefined && desde > hasta){
+        return res.status(400).json({msg: 'La fecha "desde" no puede ser posterior a "hasta"'})
+    }
+    if(formato !== undefined && !['json', 'csv'].includes(formato)){
+        return res.status(400).json({msg: 'El formato debe ser json o csv'})
+    }
+    next()
+}
+
+const validarFiltroNotificaciones = (req, res, next) => {
+    const {leida} = req.query
+    if(leida !== undefined && !['true', 'false'].includes(leida)){
+        return res.status(400).json({msg: 'El filtro leida debe ser true o false'})
+    }
+    next()
+}
+
+const validarIdNotificacion = (req, res, next) => {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)){
+        return res.status(400).json({msg: 'El id de la notificacion no es valido'})
+    }
+    next()
+}
+
+// usuarios: eliminar alumnos
+const validarIdUsuario = (req, res, next) => {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)){
+        return res.status(400).json({msg: 'El id del usuario no es valido'})
+    }
+    next()
+}
+
+// valida que el alumno envie su contraseña para eliminar su cuenta
+const validarEliminarCuenta = (req, res, next) => {
+    if(!textoValido(req.body?.password)){
+        return res.status(400).json({msg: 'Debes enviar tu contraseña para eliminar la cuenta'})
+    }
+    next()
+}
+
 export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion,
-        validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo}
+        validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo,
+        validarFiltrosReporte, validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}

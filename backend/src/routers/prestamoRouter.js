@@ -1,8 +1,8 @@
 import {Router} from 'express'
-import {solicitarPrestamo, misPrestamos, cancelarPrestamo, listarPrestamos, aprobarPrestamo, rechazarPrestamo, verQR, escanearQR} from '../controllers/prestamoController.js'
+import {solicitarPrestamo, misPrestamos, historialPrestamos, cancelarPrestamo, listarPrestamos, aprobarPrestamo, rechazarPrestamo, verQR, escanearQR} from '../controllers/prestamoController.js'
 import {verificarTokenJWT} from '../middlewares/authMiddleware.js'
 import {permitirRoles} from '../middlewares/roleMiddleware.js'
-import {validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo} from '../middlewares/validationMiddleware.js'
+import {validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo, validarFiltrosReporte} from '../middlewares/validationMiddleware.js'
 const router = Router()
 
 const soloEstudiante = [verificarTokenJWT, permitirRoles('estudiante')]
@@ -11,6 +11,8 @@ const soloAdministrador = [verificarTokenJWT, permitirRoles('administrador')]
 // HU007: el estudiante gestiona sus solicitudes
 router.post('/prestamos', soloEstudiante, validarSolicitudPrestamo, solicitarPrestamo)
 router.get('/prestamos/mis', soloEstudiante, misPrestamos)
+// HU-008: historial con filtros por estado y fechas
+router.get('/historial', soloEstudiante, validarFiltrosReporte, historialPrestamos)
 router.put('/prestamos/:id/cancelar', soloEstudiante, validarIdPrestamo, cancelarPrestamo)
 
 // QR de una solicitud aprobada lo ve su dueño o el administrador

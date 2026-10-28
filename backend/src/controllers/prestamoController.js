@@ -1,6 +1,8 @@
 import Prestamo, {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
 import Recurso from '../models/Recurso.js'
 import {generarCodigoQR, generarImagenQR} from '../helpers/qrHelper.js'
+import {notificar, notificarAdministradores, formatearFecha} from '../helpers/notificacionHelper.js'
+import {rangoFechas} from '../helpers/reporteHelper.js'
 
 const CAMPOS_USUARIO = 'nombres apellidos cedula correo facultad'
 const CAMPOS_RECURSO = 'nombre categoria estado imagen'
@@ -47,6 +49,8 @@ const solicitarPrestamo = async (req, res) => {
             fechaDevolucion: new Date(fechaDevolucion),
             motivo: motivo?.trim()
         })
+        // HU-010: se avisa a los administradores que hay una solicitud pendiente de revision
+        notificarAdministradores('solicitud_nueva', `${req.usuarioHeader.nombres} ${req.usuarioHeader.apellidos} solicito "${recurso.nombre}".`, prestamo._id)
         res.status(201).json({msg: 'Solicitud de prestamo enviada correctamente', prestamo: datosPrestamo(prestamo)})
     }catch(error){
         res.status(500).json({msg: `Error al solicitar el prestamo - ${error}`})
@@ -87,6 +91,22 @@ const cancelarPrestamo = async (req, res) => {
         res.status(200).json({msg: 'Solicitud cancelada correctamente', prestamo: datosPrestamo(prestamo)})
     }catch(error){
         res.status(500).json({msg: `Error al cancelar la solicitud - ${error}`})
+    }
+}
+
+// HU-008: historial de solicitudes del estudiante (filtros opcionales ?estado ?desde ?hasta) con un resumen por estado
+const historialPrestamos = async (req, res) => {
+    const {estado, desde, hasta} = req.query
+    try{
+        const filtro = {usuario: req.usuarioHeader._id}
+        if(estado) filtro.estado = estado
+        const rango = rangoFechas(desde, hasta)
+        if(rango) filtro.createdAt = rango
+        const prestamos = await Prestamo.find(filtro).populate('recurso', CAMPOS_RECURSO).sort({createdAt: -1})
+        const resumen = Object.fromEntries(ESTADOS_PRESTAMO.map(e => [e, prestamos.filter(p => p.estado === e).length]))
+        res.status(200).json({total: prestamos.length, resumen, prestamos: prestamos.map(datosPrestamo)})
+    }catch(error){
+        res.status(500).json({msg: `Error al consultar tu historial - ${error}`})
     }
 }
 
@@ -134,6 +154,7 @@ const aprobarPrestamo = async (req, res) => {
         prestamo.aprobadoPor = req.usuarioHeader._id
         await prestamo.save()
         const qr = await generarImagenQR(prestamo.codigoQR)
+        notificar(prestamo.usuario, 'aprobado', `Tu solicitud de "${recurso.nombre}" fue aprobada. Ya puedes ver tu codigo QR y retirar el recurso.`, prestamo._id)
         res.status(200).json({msg: 'Solicitud aprobada correctamente', prestamo: datosPrestamo(prestamo), qr})
     }catch(error){
         res.status(500).json({msg: `Error al aprobar la solicitud - ${error}`})
@@ -154,6 +175,8 @@ const rechazarPrestamo = async (req, res) => {
         prestamo.estado = 'rechazado'
         prestamo.motivoRechazo = motivo?.trim() ?? ''
         await prestamo.save()
+        const recurso = await Recurso.findById(prestamo.recurso).select('nombre')
+        notificar(prestamo.usuario, 'rechazado', `Tu solicitud de "${recurso?.nombre ?? 'el recurso'}" fue rechazada.${prestamo.motivoRechazo ? ` Motivo: ${prestamo.motivoRechazo}` : ''}`, prestamo._id)
         res.status(200).json({msg: 'Solicitud rechazada correctamente', prestamo: datosPrestamo(prestamo)})
     }catch(error){
         res.status(500).json({msg: `Error al rechazar la solicitud - ${error}`})
@@ -210,6 +233,9 @@ const escanearQR = async (req, res) => {
         }
         await prestamo.save()
         await recurso.save()
+        notificar(prestamo.usuario, accion === 'entrega' ? 'entregado' : 'devuelto', accion === 'entrega'
+            ? `Se registro la entrega de "${recurso.nombre}". Devuelvelo antes del ${formatearFecha(prestamo.fechaDevolucion)}.`
+            : `Se registro la devolucion de "${recurso.nombre}". Gracias por devolverlo.`, prestamo._id)
         res.status(200).json({
             msg: accion === 'entrega' ? 'Entrega registrada correctamente' : 'Devolucion registrada correctamente',
             accion,
@@ -221,4 +247,4 @@ const escanearQR = async (req, res) => {
     }
 }
 
-export {solicitarPrestamo, misPrestamos, cancelarPrestamo, listarPrestamos, aprobarPrestamo, rechazarPrestamo, verQR, escanearQR}
+export {solicitarPrestamo, misPrestamos, historialPrestamos, cancelarPrestamo, listarPrestamos, aprobarPrestamo, rechazarPrestamo, verQR, escanearQR}
