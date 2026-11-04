@@ -1,4 +1,4 @@
-import Prestamo, {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
+import Prestamo, {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, mensajePrestamoActivo} from '../models/Prestamo.js'
 import Recurso from '../models/Recurso.js'
 import {generarCodigoQR, generarImagenQR} from '../helpers/qrHelper.js'
 import {notificar, notificarAdministradores, formatearFecha} from '../helpers/notificacionHelper.js'
@@ -32,16 +32,16 @@ const solicitarPrestamo = async (req, res) => {
         if(!recurso){
             return res.status(404).json({msg: 'Recurso no encontrado'})
         }
-        if(recurso.estado !== 'disponible'){
-            return res.status(400).json({msg: 'El recurso no esta disponible'})
-        }
+        // un solo prestamo a la vez: cualquier solicitud pendiente, aprobada o entregada bloquea otra nueva
         const activa = await Prestamo.findOne({
             usuario: req.usuarioHeader._id,
-            recurso: recurso._id,
-            estado: {$in: ['pendiente', 'aprobado', 'entregado']}
-        })
+            estado: {$in: ESTADOS_ACTIVOS}
+        }).populate('recurso', 'nombre')
         if(activa){
-            return res.status(400).json({msg: 'Ya tienes una solicitud activa para este recurso'})
+            return res.status(400).json({msg: mensajePrestamoActivo(activa.estado, activa.recurso?.nombre)})
+        }
+        if(recurso.estado !== 'disponible'){
+            return res.status(400).json({msg: 'El recurso no esta disponible'})
         }
         const prestamo = await Prestamo.create({
             usuario: req.usuarioHeader._id,

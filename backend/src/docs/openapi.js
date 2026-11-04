@@ -373,7 +373,7 @@ export default {
         '/api/prestamos': {
             post: {
                 tags: ['Prestamos - Estudiante (HU-007, HU-008)'], summary: 'Solicitar un prestamo (estudiante)', operationId: 'solicitarPrestamo', security: conToken,
-                description: 'El recurso debe estar `disponible` y el estudiante no puede tener otra solicitud activa del mismo recurso. La fecha de devolucion debe ser futura y de maximo 30 dias. Se notifica a los administradores.',
+                description: 'El recurso debe estar `disponible` y el estudiante no puede tener ningun otro prestamo activo (`pendiente`, `aprobado` o `entregado`): solo se permite uno a la vez. La fecha de devolucion debe ser futura y de maximo 30 dias. Se notifica a los administradores.',
                 requestBody: {required: true, content: json({
                     type: 'object', required: ['recursoId', 'fechaDevolucion'],
                     properties: {
@@ -384,7 +384,7 @@ export default {
                 })},
                 responses: {
                     201: ok('Solicitud creada en estado pendiente', {type: 'object', properties: {msg: {type: 'string'}, prestamo: ref('Prestamo')}}),
-                    400: error('Datos invalidos, recurso no disponible o solicitud duplicada', 'El recurso no esta disponible'),
+                    400: error('Datos invalidos, recurso no disponible o el estudiante ya tiene un prestamo activo', 'Ya tienes un prestamo en curso (Camara reflex). Devuelvelo antes de solicitar otro recurso'),
                     401: r401, 403: r403, 404: error('Recurso inexistente', 'Recurso no encontrado')
                 }
             },

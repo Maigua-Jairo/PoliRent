@@ -49,5 +49,16 @@ const PrestamoSchema = new Schema({
     timestamps: true
 })
 
-export {ESTADOS_PRESTAMO}
+// un estudiante solo puede tener un prestamo en uno de estos estados a la vez
+const ESTADOS_ACTIVOS = ['pendiente', 'aprobado', 'entregado']
+
+// mensaje para el estudiante que intenta solicitar otro recurso teniendo un prestamo activo
+const mensajePrestamoActivo = (estado, nombreRecurso) => {
+    const recurso = nombreRecurso ? ` (${nombreRecurso})` : ''
+    return estado === 'pendiente'
+        ? `Ya tienes una solicitud en revision${recurso}. Cancelala o espera la respuesta antes de solicitar otro recurso`
+        : `Ya tienes un prestamo en curso${recurso}. Devuelvelo antes de solicitar otro recurso`
+}
+
+export {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, mensajePrestamoActivo}
 export default model('Prestamo', PrestamoSchema)
