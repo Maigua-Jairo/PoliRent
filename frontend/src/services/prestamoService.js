@@ -7,6 +7,16 @@ export const listarMisPrestamos = async ({ estado } = {}, { signal } = {}) => {
   return data
 }
 
+/* HU-008: historial del estudiante con filtros opcionales por estado y rango de fechas */
+export const listarHistorialPrestamos = async ({ estado, desde, hasta } = {}, { signal } = {}) => {
+  const params = {}
+  if (estado) params.estado = estado
+  if (desde) params.desde = desde
+  if (hasta) params.hasta = hasta
+  const { data } = await axiosClient.get('/api/historial', { params, signal })
+  return data
+}
+
 /* HU-008: fechaDevolucion en ISO; motivo opcional (≤ 300) */
 export const solicitarPrestamo = async ({ recursoId, fechaDevolucion, motivo }) => {
   const { data } = await axiosClient.post('/api/prestamos', { recursoId, fechaDevolucion, motivo })

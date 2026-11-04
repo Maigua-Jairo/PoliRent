@@ -103,14 +103,14 @@ describe('Dashboard del administrador (HU-003)', () => {
     expect(await screen.findByText('Solicitud rechazada correctamente')).toBeInTheDocument()
   })
 
-  test('la barra lateral marca como próximamente las pantallas que no existen', async () => {
+  test('la barra lateral mantiene los accesos funcionales del administrador', async () => {
     renderAdmin()
     const navegacion = within(screen.getByRole('navigation', { name: 'Principal' }))
 
     expect(navegacion.getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page')
     expect(navegacion.getByRole('link', { name: 'Herramientas' })).toHaveAttribute('href', '/admin/recursos')
-    expect(navegacion.queryByRole('link', { name: /Entrega y devolución/ })).not.toBeInTheDocument()
-    expect(navegacion.getByText('Entrega y devolución').closest('[aria-disabled]')).toHaveAttribute('aria-disabled', 'true')
+    expect(navegacion.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument()
+    expect(navegacion.queryByRole('link', { name: 'Configuración' })).not.toBeInTheDocument()
     expect((await screen.findAllByText('Multímetro digital')).length).toBeGreaterThan(0)
   })
 })

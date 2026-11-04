@@ -57,12 +57,9 @@ export function ConsultasRecientes({ consultas, ahora, onRepetir, deshabilitado 
                 type="button"
                 onClick={() => onRepetir(texto)}
                 disabled={deshabilitado}
-                className="-mx-2 flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800/60"
+                className="-mx-2 flex w-full items-start rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800/60"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400" aria-hidden="true">
-                  <Icon size={16}>{iconos.solicitudes}</Icon>
-                </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 text-xs font-semibold text-slate-700 dark:text-slate-200">{texto}</span>
                   <span className="block text-[11px] text-slate-400 dark:text-slate-500">{fechaRelativa(fecha, ahora)}</span>
                 </span>

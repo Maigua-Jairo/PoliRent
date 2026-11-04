@@ -42,6 +42,7 @@ const renderPanel = (ruta = '/dashboard') =>
         <Route element={<AppLayout />}>
           <Route element={<RutaProtegida roles={['estudiante']} />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/recomendaciones" element={<p>Pantalla de recomendaciones</p>} />
           </Route>
         </Route>
         <Route path="/recursos" element={<Catalogo />} />
@@ -72,6 +73,7 @@ describe('Dashboard del estudiante', () => {
     useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario: { ...usuario, rol: 'administrador' } })
     renderPanel()
     expect(screen.getByText('Landing')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Abrir asistente PoliRent' })).not.toBeInTheDocument()
   })
 
   test('muestra el saludo, los movimientos y las recomendaciones con su reserva', async () => {
@@ -79,6 +81,7 @@ describe('Dashboard del estudiante', () => {
     renderPanel()
 
     expect(screen.getByRole('heading', { level: 1, name: /¡Hola, Jairo!/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir asistente PoliRent' })).toBeInTheDocument()
     const movimientos = within(screen.getByRole('region', { name: 'Últimos movimientos' }))
     expect(await movimientos.findByText('Préstamo entregado')).toBeInTheDocument()
     expect(movimientos.getByText('Laptop Dell Inspiron 15')).toBeInTheDocument()
@@ -143,6 +146,31 @@ describe('Dashboard del estudiante', () => {
     const navegacion = within(screen.getByRole('navigation', { name: 'Principal' }))
     expect(navegacion.getByRole('link', { name: 'Recomendaciones inteligentes' })).toBeInTheDocument()
     expect(navegacion.queryByRole('link', { name: 'Recursos' })).not.toBeInTheDocument()
+  })
+
+  test('el botón flotante abre el chat en recomendaciones y responde dudas del sistema', async () => {
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel('/recomendaciones')
+
+    expect(screen.getByText('Pantalla de recomendaciones')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
+    expect(screen.getByRole('region', { name: 'Chat de ayuda PoliRent' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '¿Cómo solicito un recurso?' }))
+    expect(await screen.findByText(/Explora el catálogo, abre la ficha del recurso/)).toBeInTheDocument()
+  })
+
+  test('el chat flotante envía el contexto al servicio de recomendaciones', async () => {
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' }), 'Necesito herramientas para electrónica')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
+
+    expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
+      { contexto: 'Necesito herramientas para electrónica', limite: 3 },
+    )
+    expect(await screen.findByText('Encontré estos recursos que podrían servirte:')).toBeInTheDocument()
   })
 
   test('/recursos redirige a la sección Recursos de la landing', () => {

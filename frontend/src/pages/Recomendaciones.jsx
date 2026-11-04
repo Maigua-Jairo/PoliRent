@@ -187,15 +187,6 @@ export default function Recomendaciones() {
         </aside>
       </div>
 
-      {/* Acceso rápido al cuadro de consulta */}
-      <button
-        type="button"
-        onClick={() => entrada.current?.focus()}
-        aria-label="Escribir una consulta al asistente"
-        className="fixed right-6 bottom-6 z-20 hidden h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-xl shadow-brand-500/40 transition-transform hover:scale-105 lg:grid"
-      >
-        <Icon size={26}>{iconos.bot}</Icon>
-      </button>
     </div>
   )
 }

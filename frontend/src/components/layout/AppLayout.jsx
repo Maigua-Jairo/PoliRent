@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../Icon.jsx'
 import ThemeToggle from '../ThemeToggle.jsx'
 import MenuUsuario from './MenuUsuario.jsx'
 import { iconos } from './iconos.jsx'
 import { esAdministrador, rutaInicio, useAuthStore } from '../../store/authStore.js'
+import { listarNotificaciones, marcarNotificacionLeida, marcarTodasNotificacionesLeidas } from '../../services/notificacionService.js'
+import { obtenerMensajeError } from '../../services/authService.js'
+import AsistenteFlotante from '../recomendaciones/AsistenteFlotante.jsx'
 
 const enlace = ({ isActive }) =>
   `flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-brand-400 ${
@@ -15,33 +18,28 @@ const enlace = ({ isActive }) =>
 
 const seccionCuenta = (search) => new URLSearchParams(search).get('seccion') ?? 'perfil'
 
-// Navegación del panel por rol, en grupos. `proximamente`: pantalla aún no implementada.
-// El catálogo y la reserva viven fuera del panel (PublicLayout): se llega desde la landing,
-// el buscador superior, las recomendaciones o "Página principal" del menú del usuario
+// Navegación del panel por rol. Los accesos administrativos apuntan a las vistas existentes
+// y reflejan la información que ya expone el backend.
 const navegacionPorRol = (usuario) => {
   if (esAdministrador(usuario)) {
     return [
       { items: [{ to: '/admin', etiqueta: 'Inicio', icono: iconos.inicio, end: true }] },
       {
         titulo: 'Gestión de Recursos',
-        items: [
-          { to: '/admin/recursos', etiqueta: 'Herramientas', icono: iconos.lapiz },
-          { etiqueta: 'Categorías', icono: iconos.categorias, proximamente: true },
-          { etiqueta: 'Inventario', icono: iconos.recursos, proximamente: true },
-        ],
+        items: [{ to: '/admin/recursos', etiqueta: 'Herramientas', icono: iconos.lapiz }],
       },
       {
         titulo: 'Solicitudes',
         items: [
-          { etiqueta: 'Solicitudes de préstamo', icono: iconos.solicitudes, proximamente: true },
-          { etiqueta: 'Entrega y devolución', icono: iconos.camion, proximamente: true },
+          { to: '/admin/solicitudes', etiqueta: 'Solicitudes de préstamo', icono: iconos.solicitudes },
+          { to: '/admin/entrega', etiqueta: 'Entrega y devolución', icono: iconos.camion },
         ],
       },
       {
         titulo: 'Reportes',
         items: [
-          { etiqueta: 'Historial de préstamos', icono: iconos.historial, proximamente: true },
-          { etiqueta: 'Métricas y reportes', icono: iconos.grafico, proximamente: true },
+          { to: '/admin/historial', etiqueta: 'Historial de préstamos', icono: iconos.historial },
+          { to: '/admin/metricas', etiqueta: 'Métricas y reportes', icono: iconos.grafico },
         ],
       },
       {
@@ -52,12 +50,6 @@ const navegacionPorRol = (usuario) => {
             etiqueta: 'Mi perfil',
             icono: iconos.cuenta,
             activo: ({ pathname, search }) => pathname === '/perfil' && seccionCuenta(search) === 'perfil',
-          },
-          {
-            to: '/perfil?seccion=seguridad',
-            etiqueta: 'Configuración',
-            icono: iconos.ajustes,
-            activo: ({ pathname, search }) => pathname === '/perfil' && seccionCuenta(search) !== 'perfil',
           },
         ],
       },
@@ -77,16 +69,7 @@ const navegacionPorRol = (usuario) => {
 
 function ItemNavegacion({ item, onNavegar }) {
   const location = useLocation()
-  const { to, etiqueta, icono, end, activo, proximamente } = item
-  if (proximamente) {
-    return (
-      <span aria-disabled="true" title="Disponible próximamente" className={`${enlace({ isActive: false })} cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-300`}>
-        <Icon size={20}>{icono}</Icon>
-        {etiqueta}
-        <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Pronto</span>
-      </span>
-    )
-  }
+  const { to, etiqueta, icono, end, activo } = item
   if (activo) {
     const esActivo = activo(location)
     return (
@@ -148,9 +131,77 @@ function BarraLateral({ usuario, onNavegar }) {
   )
 }
 
-/* ---------- Campana de notificaciones (provisional: aún no existen en el backend) ---------- */
+/* ---------- Campana de notificaciones con lectura desde el backend ---------- */
 function Notificaciones() {
   const [abierto, setAbierto] = useState(false)
+  const [notificaciones, setNotificaciones] = useState([])
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+
+  const recargar = async () => {
+    try {
+      setCargando(true)
+      const respuesta = await listarNotificaciones()
+      setNotificaciones(respuesta.notificaciones ?? [])
+      setError('')
+    } catch (e) {
+      setError(obtenerMensajeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!abierto) return
+    const controlador = new AbortController()
+    listarNotificaciones({}, { signal: controlador.signal })
+      .then((respuesta) => {
+        if (!controlador.signal.aborted) setNotificaciones(respuesta.notificaciones ?? [])
+      })
+      .catch((e) => {
+        if (!controlador.signal.aborted) setError(obtenerMensajeError(e))
+      })
+      .finally(() => {
+        if (!controlador.signal.aborted) setCargando(false)
+      })
+    return () => controlador.abort()
+  }, [abierto])
+
+  useEffect(() => {
+    const controlador = new AbortController()
+    listarNotificaciones({}, { signal: controlador.signal })
+      .then((respuesta) => {
+        if (!controlador.signal.aborted) setNotificaciones(respuesta.notificaciones ?? [])
+      })
+      .catch((e) => {
+        if (!controlador.signal.aborted) setError(obtenerMensajeError(e))
+      })
+      .finally(() => {
+        if (!controlador.signal.aborted) setCargando(false)
+      })
+    return () => controlador.abort()
+  }, [])
+
+  const noLeidas = notificaciones.filter((n) => !n.leida).length
+
+  const marcarLeida = async (id) => {
+    try {
+      await marcarNotificacionLeida(id)
+      await recargar()
+    } catch (e) {
+      setError(obtenerMensajeError(e))
+    }
+  }
+
+  const marcarTodas = async () => {
+    try {
+      await marcarTodasNotificacionesLeidas()
+      await recargar()
+    } catch (e) {
+      setError(obtenerMensajeError(e))
+    }
+  }
+
   return (
     <div className="relative" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setAbierto(false)}>
       <button
@@ -158,14 +209,46 @@ function Notificaciones() {
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
         aria-label="Notificaciones"
-        className="grid h-10 w-10 place-items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
       >
         <Icon size={20}>{iconos.campana}</Icon>
+        {noLeidas > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-5 rounded-full bg-red-500 px-1 text-[10px] font-bold leading-5 text-white">
+            {noLeidas > 9 ? '9+' : noLeidas}
+          </span>
+        )}
       </button>
       {abierto && (
-        <p className="absolute right-0 z-50 mt-2 w-60 rounded-xl bg-white p-4 text-sm text-slate-600 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
-          No tienes notificaciones nuevas.
-        </p>
+        <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl bg-white p-3 text-sm text-slate-600 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="font-semibold text-slate-800 dark:text-white">Notificaciones</p>
+            {noLeidas > 0 && (
+              <button type="button" onClick={marcarTodas} className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                Marcar todas
+              </button>
+            )}
+          </div>
+          {cargando && <p className="py-2 text-xs text-slate-500 dark:text-slate-400">Cargando…</p>}
+          {!cargando && error && <p className="py-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+          {!cargando && !error && notificaciones.length === 0 && <p className="py-2 text-xs text-slate-500 dark:text-slate-400">No tienes notificaciones nuevas.</p>}
+          {!cargando && !error && notificaciones.length > 0 && (
+            <ul className="max-h-80 space-y-2 overflow-y-auto">
+              {notificaciones.slice(0, 8).map((n) => (
+                <li key={n._id} className={`rounded-lg border p-2 ${n.leida ? 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60' : 'border-brand-200 bg-brand-50 dark:border-brand-500/40 dark:bg-brand-500/10'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs leading-5 text-slate-700 dark:text-slate-200">{n.mensaje}</p>
+                    {!n.leida && (
+                      <button type="button" onClick={() => marcarLeida(n._id)} className="shrink-0 text-[10px] font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                        Marcar
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">{new Date(n.createdAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   )
@@ -264,6 +347,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+      {sesion.rol === 'estudiante' && <AsistenteFlotante />}
     </div>
   )
 }

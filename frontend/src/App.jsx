@@ -14,6 +14,10 @@ import DetalleRecurso from './pages/DetalleRecurso.jsx'
 import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
 import GestionRecursos from './pages/admin/GestionRecursos.jsx'
 import FormularioRecurso from './pages/admin/FormularioRecurso.jsx'
+import AdminSolicitudes from './pages/admin/AdminSolicitudes.jsx'
+import AdminEntrega from './pages/admin/AdminEntrega.jsx'
+import AdminHistorial from './pages/admin/AdminHistorial.jsx'
+import AdminMetricas from './pages/admin/AdminMetricas.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import PublicLayout from './components/layout/PublicLayout.jsx'
 import RutaProtegida from './components/routes/RutaProtegida.jsx'
@@ -59,6 +63,10 @@ function App() {
             <Route path="/admin/recursos" element={<GestionRecursos />} />
             <Route path="/admin/recursos/nuevo" element={<FormularioRecurso />} />
             <Route path="/admin/recursos/:id/editar" element={<FormularioRecurso />} />
+            <Route path="/admin/solicitudes" element={<AdminSolicitudes />} />
+            <Route path="/admin/entrega" element={<AdminEntrega />} />
+            <Route path="/admin/historial" element={<AdminHistorial />} />
+            <Route path="/admin/metricas" element={<AdminMetricas />} />
           </Route>
         </Route>
 
