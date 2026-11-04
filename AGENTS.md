@@ -60,5 +60,6 @@ Verificación completa: `npm test` en ambos + `npm run lint` y `npm run build` e
 ## Backend
 
 - Archivos vacíos reservados para trabajo futuro: préstamos (`prestamoController`, `prestamoRouter`, `models/Prestamo`), recomendaciones (`recomendacionController`, `recomendacionRouter`), QR (`helpers/qrHelper`), `helpers/responseHelper`, `routers/index`. No los borres.
+- Recursos de ejemplo: `npm run seed` (`src/seed/`), inserta solo los nombres que faltan; `-- --dry` para simular.
 - `POST /api/recuperar-clave` envía el enlace `FRONTEND_URL/recuperar-clave/:token` al correo institucional por SMTP (`src/config/mailer.js`, variables `SMTP_*`). Sin SMTP: en producción responde 503; con `NODE_ENV=development` además devuelve el token en la respuesta para probar sin correo.
 - `GET /api/recursos` acepta `categoria`, `estado` y `buscar` (texto literal en nombre/descripción, sin distinguir mayúsculas).
