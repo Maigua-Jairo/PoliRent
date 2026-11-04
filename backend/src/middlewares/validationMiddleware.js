@@ -210,6 +210,27 @@ const validarRecomendacion = (req, res, next) => {
     next()
 }
 
+// asistente: mensaje del usuario y, opcionalmente, los ultimos mensajes de la conversacion
+const MENSAJE_ASISTENTE_MAX = 500
+const HISTORIAL_ASISTENTE_MAX = 10
+const validarMensajeAsistente = (req, res, next) => {
+    const {mensaje, historial} = req.body ?? {}
+    if(!textoValido(mensaje)){
+        return res.status(400).json({msg: 'Escribe tu pregunta'})
+    }
+    if(mensaje.trim().length < 2 || mensaje.trim().length > MENSAJE_ASISTENTE_MAX){
+        return res.status(400).json({msg: `El mensaje debe tener entre 2 y ${MENSAJE_ASISTENTE_MAX} caracteres`})
+    }
+    if(historial !== undefined){
+        const valido = Array.isArray(historial) && historial.length <= HISTORIAL_ASISTENTE_MAX && historial.every(h =>
+            h && ['usuario', 'asistente'].includes(h.rol) && textoValido(h.texto) && h.texto.length <= 2000)
+        if(!valido){
+            return res.status(400).json({msg: `historial debe ser una lista de maximo ${HISTORIAL_ASISTENTE_MAX} mensajes {rol: usuario|asistente, texto}`})
+        }
+    }
+    next()
+}
+
 // hu003 / hu007 prestamos
 const DIAS_MAX_PRESTAMO = 30
 
@@ -320,6 +341,6 @@ const validarEliminarCuenta = (req, res, next) => {
     next()
 }
 
-export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion,
+export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion, validarMensajeAsistente,
         validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo,
         validarFiltrosReporte, validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}

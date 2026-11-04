@@ -47,6 +47,7 @@ export default {
         {name: 'Cuenta (HU-001)', description: 'Registro, inicio de sesion, perfil y recuperacion de clave'},
         {name: 'Recursos (HU-002, HU-005, HU-006)', description: 'Catalogo publico y gestion de recursos por el administrador'},
         {name: 'Recomendaciones con IA (HU-009)', description: 'Recomendacion de recursos por contexto del proyecto y por historial de prestamos'},
+        {name: 'Asistente (chat)', description: 'Chat publico: dudas sobre PoliRent y recomendacion de recursos para proyectos o actividades'},
         {name: 'Prestamos - Estudiante (HU-007, HU-008)', description: 'Solicitar, cancelar, ver el QR y consultar el historial'},
         {name: 'Prestamos - Administrador (HU-003)', description: 'Revisar, aprobar, rechazar y escanear el QR de entrega y devolucion'},
         {name: 'Metricas y reportes (HU-004)', description: 'Consultas de solo lectura para el administrador'},
@@ -365,6 +366,53 @@ export default {
                     200: ok('Recomendaciones (puede venir vacia si nada coincide)', {type: 'object', properties: {msg: {type: 'string'}, total: {type: 'integer'}, recomendaciones: {type: 'array', items: ref('Recomendacion')}}}),
                     400: error('Datos invalidos', 'El contexto debe tener entre 5 y 500 caracteres'),
                     401: r401, 403: r403
+                }
+            }
+        },
+
+        // ---------------- Asistente (chat) ----------------
+        '/api/asistente': {
+            post: {
+                tags: ['Asistente (chat)'], summary: 'Conversar con el asistente de PoliRent (publico, sesion opcional)', operationId: 'conversarAsistente',
+                security: [{}, {bearerAuth: []}],
+                description: [
+                    'Un solo chat que atiende dos temas y rechaza el resto:',
+                    '',
+                    '- **ayuda**: dudas sobre el uso de PoliRent (registro, inicio y cierre de sesion, contraseña, reservas, plazo, prestamo unico, cancelar, retiro y devolucion...). Trae `enlaces` a las pantallas del frontend.',
+                    '- **recomendacion**: el usuario describe su proyecto o actividad y recibe recursos **disponibles** del catalogo en `recomendaciones` (mismo formato que `POST /api/recomendaciones`).',
+                    '- **fuera_de_tema**: cualquier otra pregunta; responde que solo ayuda con PoliRent y recursos.',
+                    '',
+                    '**Motor hibrido** (`motor`): con `GEMINI_API_KEY` las preguntas que el motor local no reconoce con seguridad las redacta Google Gemini, que solo puede elegir recursos de la lista enviada (los ids inventados se descartan). Las dudas claras se responden al instante con el motor local, y si Gemini falla, tarda o no hay clave tambien responde el motor local (preguntas frecuentes + TF-IDF). El nivel gratuito de Gemini puede tardar 10-20 s.',
+                    '',
+                    'Con token de estudiante, `prestamoActivo` indica si ya tiene un prestamo activo (solo se permite uno a la vez). Un token invalido responde 401.'
+                ].join('\n'),
+                requestBody: {required: true, content: json({
+                    type: 'object', required: ['mensaje'],
+                    properties: {
+                        mensaje: {type: 'string', minLength: 2, maxLength: 500, example: 'que me recomiendas si tengo que realizar una exposicion'},
+                        historial: {type: 'array', maxItems: 10, description: 'Mensajes anteriores de la conversacion (opcional; solo los usa Gemini para entender continuaciones)',
+                            items: {type: 'object', required: ['rol', 'texto'], properties: {rol: {type: 'string', enum: ['usuario', 'asistente']}, texto: {type: 'string', maxLength: 2000}}}}
+                    }
+                })},
+                responses: {
+                    200: ok('Respuesta del asistente', {type: 'object', properties: {
+                        tipo: {type: 'string', enum: ['ayuda', 'recomendacion', 'fuera_de_tema']},
+                        respuesta: {type: 'string', description: 'Texto para mostrar en el chat'},
+                        enlaces: {type: 'array', items: {type: 'object', properties: {texto: {type: 'string'}, ruta: {type: 'string', example: '/solicitudes'}}}},
+                        recomendaciones: {type: 'array', items: {type: 'object', properties: {
+                            recurso: ref('Recurso'), relevancia: {type: 'integer', nullable: true, minimum: 1, maximum: 100}, razon: {type: 'string'}}}},
+                        prestamoActivo: {type: 'object', nullable: true, properties: {_id: {type: 'string'}, estado: {type: 'string', enum: ['pendiente', 'aprobado', 'entregado']}, recurso: {type: 'object', properties: {_id: {type: 'string'}, nombre: {type: 'string'}}}}},
+                        motor: {type: 'string', enum: ['gemini', 'local']}
+                    }}, {
+                        tipo: 'recomendacion',
+                        respuesta: 'Te pueden servir estos recursos disponibles: Proyector Epson, Clicker inalambrico y Pantalla de proyeccion. Abre cualquiera para ver su ficha y reservarlo.',
+                        enlaces: [],
+                        recomendaciones: [{recurso: {_id: '64b7f0f2a1b2c3d4e5f60701', nombre: 'Proyector Epson', categoria: 'academico', estado: 'disponible'}, relevancia: 100, razon: 'Coincide con tu proyecto en: exposicion'}],
+                        prestamoActivo: null,
+                        motor: 'local'
+                    }),
+                    400: error('Mensaje o historial invalidos', 'El mensaje debe tener entre 2 y 500 caracteres'),
+                    401: r401
                 }
             }
         },

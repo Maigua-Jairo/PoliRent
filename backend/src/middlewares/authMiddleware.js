@@ -23,4 +23,9 @@ const verificarTokenJWT = async (req, res, next) => {
         return res.status(401).json({msg: 'Token invalido o expirado'})
     }
 }
-export {verificarTokenJWT}
+// sesion opcional: sin encabezado Authorization sigue como invitado; con el encabezado lo valida igual que verificarTokenJWT
+const verificarTokenOpcional = (req, res, next) => {
+    if(!req.headers.authorization) return next()
+    return verificarTokenJWT(req, res, next)
+}
+export {verificarTokenJWT, verificarTokenOpcional}

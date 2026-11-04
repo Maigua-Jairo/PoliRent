@@ -4,6 +4,7 @@ import morgan from 'morgan'
 import authRouter from './routers/authRouter.js'
 import recursoRouter from './routers/recursoRouter.js'
 import recomendacionRouter from './routers/recomendacionRouter.js'
+import asistenteRouter from './routers/asistenteRouter.js'
 import prestamoRouter from './routers/prestamoRouter.js'
 import notificacionRouter from './routers/notificacionRouter.js'
 import reporteRouter from './routers/reporteRouter.js'
@@ -28,6 +29,7 @@ app.get('/',(req, res)=>{
 app.use('/api', authRouter)
 app.use('/api', recursoRouter)
 app.use('/api', recomendacionRouter)
+app.use('/api', asistenteRouter)
 app.use('/api', prestamoRouter)
 app.use('/api', notificacionRouter)
 app.use('/api', reporteRouter)
