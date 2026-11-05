@@ -77,11 +77,12 @@ describe('Recomendaciones inteligentes (HU-009)', () => {
     expect(recursos.getByRole('img', { name: 'Cámara Raspberry Pi HQ' })).toHaveAttribute('src', 'https://res.cloudinary.com/demo/camara.jpg')
     expect(recursos.getByText('OpenCV - Guía práctica')).toBeInTheDocument()
     expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
-      expect.objectContaining({ contexto: 'Proyecto de visión por computadora' }),
+      { contexto: 'Proyecto de visión por computadora', limite: 10 },
     )
 
     const recientes = within(screen.getByRole('region', { name: 'Mis consultas recientes' }))
     expect(recientes.getByText('Proyecto de visión por computadora')).toBeInTheDocument()
+    expect(recientes.getByRole('button', { name: /Proyecto de visión por computadora/ }).querySelector('svg')).toBeNull()
   })
 
   test('los filtros están ocultos hasta pedirlos y limitan la categoría', async () => {

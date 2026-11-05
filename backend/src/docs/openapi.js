@@ -108,7 +108,7 @@ export default {
                 properties: {
                     _id: ID_SCHEMA,
                     tipo: {type: 'string', enum: TIPOS_NOTIFICACION},
-                    mensaje: {type: 'string', example: 'Tu solicitud de "Kit Arduino" fue aprobada. Ya puedes ver tu codigo QR y retirar el recurso.'},
+                    mensaje: {type: 'string', example: 'Tu solicitud de "Kit Arduino" fue aprobada. Coordina el retiro del recurso con la asociacion estudiantil.'},
                     leida: {type: 'boolean'},
                     prestamo: ID_SCHEMA,
                     createdAt: {type: 'string', format: 'date-time'}

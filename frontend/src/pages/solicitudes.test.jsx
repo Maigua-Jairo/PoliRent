@@ -7,6 +7,7 @@ import DetallePrestamo from './DetallePrestamo.jsx'
 import RutaProtegida from '../components/routes/RutaProtegida.jsx'
 import { useAuthStore } from '../store/authStore.js'
 import * as prestamoService from '../services/prestamoService.js'
+import { formatearFecha } from '../utils/prestamos.js'
 
 vi.mock('../services/prestamoService.js', () => ({
   listarMisPrestamos: vi.fn(),
@@ -60,6 +61,36 @@ describe('Mis solicitudes (HU-007)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Rechazadas \(1\)/ }))
     expect(lista.queryByText('Laptop Dell Inspiron 15')).not.toBeInTheDocument()
     expect(lista.getByText('Tablet gráfica Wacom')).toBeInTheDocument()
+  })
+
+  test('mantiene alineada la fecha aunque el recurso tenga un nombre largo', async () => {
+    const prestamosConDomino = [
+      {
+        _id: 'p-domino',
+        estado: 'entregado',
+        recurso: { _id: 'r-domino', nombre: 'Juego de dominó profesional de doble nueve', categoria: 'recreativo', imagen: '' },
+        fechaDevolucion: '2099-09-22T10:00:00Z',
+        createdAt: '2026-09-15T10:00:00Z',
+      },
+      {
+        _id: 'p-corto',
+        estado: 'pendiente',
+        recurso: { _id: 'r-corto', nombre: 'Regla', categoria: 'tecnico', imagen: '' },
+        fechaDevolucion: '2099-09-22T10:00:00Z',
+        createdAt: '2026-09-12T10:00:00Z',
+      },
+    ]
+    prestamoService.listarMisPrestamos.mockResolvedValueOnce({ prestamos: prestamosConDomino })
+    renderEn('/solicitudes')
+
+    const filaDomino = (await screen.findByText('Juego de dominó profesional de doble nueve')).closest('li')
+    const filaCorta = screen.getByText('Regla').closest('li')
+    const columnaFecha = [...within(filaDomino).getAllByText(formatearFecha(prestamosConDomino[0].createdAt))]
+      .find((elemento) => elemento.classList.contains('whitespace-nowrap'))
+
+    expect(columnaFecha).toBeInTheDocument()
+    expect(filaDomino.className).toContain('lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem]')
+    expect(filaCorta.className).toContain('lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem]')
   })
 
   test('solo permite cancelar solicitudes en revisión o aprobadas', async () => {

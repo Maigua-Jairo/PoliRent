@@ -155,22 +155,27 @@ describe('Dashboard del estudiante', () => {
     expect(screen.getByText('Pantalla de recomendaciones')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
     expect(screen.getByRole('region', { name: 'Chat de ayuda PoliRent' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '¿Cómo solicito un recurso?' }))
-    expect(await screen.findByText(/Explora el catálogo, abre la ficha del recurso/)).toBeInTheDocument()
-  })
-
-  test('el chat flotante envía el contexto al servicio de recomendaciones', async () => {
-    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
-    renderPanel()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' }), 'Necesito herramientas para electrónica')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
 
     expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
-      { contexto: 'Necesito herramientas para electrónica', limite: 3 },
+      { contexto: 'Necesito herramientas para electrónica', limite: 10 },
     )
-    expect(await screen.findByText('Encontré estos recursos que podrían servirte:')).toBeInTheDocument()
+    expect(await screen.findByText('Encontré recursos relacionados con tu consulta:')).toBeInTheDocument()
+  })
+
+  test('el chat envía una pregunta al mismo servicio de recomendaciones', async () => {
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' }), '¿Qué recursos sirven para electrónica?')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
+
+    expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
+      { contexto: '¿Qué recursos sirven para electrónica?', limite: 10 },
+    )
+    expect(await screen.findByText('Encontré recursos relacionados con tu consulta:')).toBeInTheDocument()
   })
 
   test('/recursos redirige a la sección Recursos de la landing', () => {

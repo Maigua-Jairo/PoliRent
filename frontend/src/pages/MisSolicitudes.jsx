@@ -16,7 +16,7 @@ const btnAccion =
 const btnVer = `${btnAccion} border-brand-500/40 text-brand-600 hover:bg-brand-500/10 dark:text-brand-400`
 const btnCancelar = `${btnAccion} border-red-300 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10`
 
-const columnas = 'md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_auto] md:items-center md:gap-4'
+const columnas = 'lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem] lg:items-center lg:gap-4'
 
 /* ---------- Solicitudes del estudiante con su estado (HU-007) ---------- */
 export default function MisSolicitudes() {
@@ -74,10 +74,10 @@ export default function MisSolicitudes() {
                 <ImagenRecurso recurso={recurso} tamanoIcono={18} className="h-12 w-12 shrink-0 rounded-lg" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-epn-900 dark:text-white">{recurso.nombre}</span>
-                  <span className="block text-xs text-slate-500 md:hidden dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
+                  <span className="block text-xs text-slate-500 lg:hidden dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
                 </span>
               </div>
-              <span className="hidden text-sm text-slate-500 md:block dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
+              <span className="hidden whitespace-nowrap text-sm text-slate-500 lg:block dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
               <span>
                 <EtiquetaPrestamo estado={p.estado} />
               </span>
@@ -118,7 +118,7 @@ export default function MisSolicitudes() {
 
       <section aria-label="Solicitudes" className={`${tarjeta} overflow-hidden`}>
         <div
-          className={`hidden border-b border-slate-200 bg-slate-50 px-6 py-3 text-xs font-bold tracking-wide text-slate-600 uppercase md:grid dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 ${columnas}`}
+          className={`hidden border-b border-slate-200 bg-slate-50 px-6 py-3 text-xs font-bold tracking-wide text-slate-600 uppercase lg:grid dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 ${columnas}`}
           aria-hidden="true"
         >
           <span>Recurso</span>

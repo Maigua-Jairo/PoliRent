@@ -154,7 +154,7 @@ const aprobarPrestamo = async (req, res) => {
         prestamo.aprobadoPor = req.usuarioHeader._id
         await prestamo.save()
         const qr = await generarImagenQR(prestamo.codigoQR)
-        notificar(prestamo.usuario, 'aprobado', `Tu solicitud de "${recurso.nombre}" fue aprobada. Ya puedes ver tu codigo QR y retirar el recurso.`, prestamo._id)
+        notificar(prestamo.usuario, 'aprobado', `Tu solicitud de "${recurso.nombre}" fue aprobada. Coordina el retiro del recurso con la asociacion estudiantil.`, prestamo._id)
         res.status(200).json({msg: 'Solicitud aprobada correctamente', prestamo: datosPrestamo(prestamo), qr})
     }catch(error){
         res.status(500).json({msg: `Error al aprobar la solicitud - ${error}`})

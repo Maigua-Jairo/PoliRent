@@ -6,45 +6,7 @@ import { obtenerMensajeError } from '../../services/authService.js'
 import { obtenerRecomendaciones } from '../../services/recomendacionService.js'
 import { useAuthStore } from '../../store/authStore.js'
 import { useConsultasStore } from '../../store/consultasStore.js'
-import { CONTEXTO_MAX, validarContexto } from '../../utils/recomendaciones.js'
-
-const PREGUNTAS_FRECUENTES = [
-  {
-    pregunta: '¿Cómo solicito un recurso?',
-    palabras: ['solicit', 'reserva', 'reservar', 'prestar'],
-    respuesta: 'Explora el catálogo, abre la ficha del recurso e inicia sesión como estudiante. En la sección de solicitud elige la fecha de devolución y envía el formulario. La asociación revisará tu solicitud.',
-  },
-  {
-    pregunta: '¿Cómo funcionan las recomendaciones?',
-    palabras: ['recomendacion', 'recomendar', 'proyecto'],
-    respuesta: 'Describe tu proyecto y las herramientas que necesitas. Con ese contexto, PoliRent busca recursos disponibles relacionados. También puedes usar la pantalla completa de Recomendaciones inteligentes.',
-  },
-  {
-    pregunta: '¿Dónde reviso mis solicitudes?',
-    palabras: ['solicitudes', 'estado', 'cancelar'],
-    respuesta: 'En “Mis Solicitudes” puedes revisar el estado y los detalles. Las solicitudes pendientes o aprobadas se pueden cancelar desde su detalle.',
-  },
-  {
-    pregunta: '¿Cómo devuelvo un recurso?',
-    palabras: ['devolver', 'devolucion', 'entrega'],
-    respuesta: 'Revisa la fecha de devolución en el detalle de tu préstamo y coordina la entrega con la asociación estudiantil responsable.',
-  },
-  {
-    pregunta: '¿Cómo actualizo mis datos?',
-    palabras: ['perfil', 'cuenta', 'datos', 'contrasena'],
-    respuesta: 'Abre “Mi Cuenta” o “Mi perfil” desde el panel para revisar la configuración de tu cuenta y las opciones de seguridad.',
-  },
-]
-
-const normalizar = (texto) =>
-  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-
-const responderPregunta = (texto) => {
-  const consulta = normalizar(texto)
-  const parecePregunta = /[?¿]/.test(texto) || /^(como|donde|cuando|que|por que|puedo|necesito saber)\b/.test(consulta)
-  if (!parecePregunta) return ''
-  return PREGUNTAS_FRECUENTES.find((item) => item.palabras.some((palabra) => consulta.includes(palabra)))?.respuesta
-}
+import { CONTEXTO_MAX, LIMITE_RECOMENDACIONES, validarContexto } from '../../utils/recomendaciones.js'
 
 export default function AsistenteFlotante() {
   const usuario = useAuthStore((state) => state.usuario)
@@ -52,7 +14,6 @@ export default function AsistenteFlotante() {
   const [abierto, setAbierto] = useState(false)
   const [texto, setTexto] = useState('')
   const [mensajes, setMensajes] = useState([])
-  const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const entrada = useRef(null)
   const claveUsuario = usuario?.correo ?? usuario?.id ?? 'anonimo'
@@ -63,33 +24,29 @@ export default function AsistenteFlotante() {
 
     setMensajes((actuales) => [...actuales, { autor: 'usuario', texto: pregunta }])
     setTexto('')
-    setError('')
-
-    const respuestaFAQ = responderPregunta(pregunta)
-    if (respuestaFAQ) {
-      setMensajes((actuales) => [...actuales, { autor: 'asistente', texto: respuestaFAQ }])
-      return
-    }
 
     const errorValidacion = validarContexto(pregunta)
     if (errorValidacion) {
       setMensajes((actuales) => [
         ...actuales,
-        { autor: 'asistente', texto: `${errorValidacion} Para preguntas del sistema, puedes elegir una de las consultas frecuentes.` },
+        { autor: 'asistente', texto: errorValidacion },
       ])
       return
     }
 
     setEnviando(true)
     try {
-      const { recomendaciones = [] } = await obtenerRecomendaciones({ contexto: pregunta, limite: 3 })
+      const { recomendaciones = [] } = await obtenerRecomendaciones({
+        contexto: pregunta,
+        limite: LIMITE_RECOMENDACIONES,
+      })
       setMensajes((actuales) => [
         ...actuales,
         {
           autor: 'asistente',
           texto: recomendaciones.length
-            ? 'Encontré estos recursos que podrían servirte:'
-            : 'No encontré recursos disponibles relacionados. Prueba describiendo tu proyecto con otros términos.',
+            ? 'Encontré recursos relacionados con tu consulta:'
+            : 'No encontré recursos disponibles relacionados con tu consulta. Prueba describiendo tu proyecto o necesidad con otros términos.',
           recomendaciones,
         },
       ])
@@ -134,16 +91,20 @@ export default function AsistenteFlotante() {
             {!mensajes.length && (
               <div className="rounded-xl border border-brand-100 bg-white p-3 text-sm text-slate-700 dark:border-brand-500/20 dark:bg-slate-900 dark:text-slate-200">
                 <p className="font-semibold text-epn-900 dark:text-white">¡Hola! ¿En qué te ayudo?</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Pregunta sobre PoliRent o cuéntame qué proyecto tienes para buscar recursos.</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Haz una consulta o describe lo que necesitas. Buscaré recursos disponibles relacionados.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {PREGUNTAS_FRECUENTES.slice(0, 3).map((item) => (
+                  {[
+                    'Necesito herramientas para electrónica',
+                    'Busco material para un proyecto de software',
+                    'Quiero recursos académicos para estudiar',
+                  ].map((ejemplo) => (
                     <button
-                      key={item.pregunta}
+                      key={ejemplo}
                       type="button"
-                      onClick={() => enviar(item.pregunta)}
+                      onClick={() => enviar(ejemplo)}
                       className="rounded-full border border-slate-200 px-2.5 py-1.5 text-left text-xs font-medium text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-brand-700 dark:hover:bg-brand-500/10"
                     >
-                      {item.pregunta}
+                      {ejemplo}
                     </button>
                   ))}
                 </div>
@@ -186,7 +147,6 @@ export default function AsistenteFlotante() {
               </div>
             ))}
             {enviando && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">Buscando recursos…</p>}
-            {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           </div>
 
           <form
@@ -225,7 +185,6 @@ export default function AsistenteFlotante() {
         type="button"
         onClick={() => {
           setAbierto((actual) => !actual)
-          setError('')
         }}
         aria-label={abierto ? 'Cerrar asistente PoliRent' : 'Abrir asistente PoliRent'}
         aria-expanded={abierto}
