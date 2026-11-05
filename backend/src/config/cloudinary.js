@@ -19,7 +19,7 @@ const cloudinaryConfigurado = () => Boolean(
 const subirImagen = (buffer, carpeta = 'polirent/recursos') => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream({folder: carpeta, resource_type: 'image'}, (error, resultado) => {
-            if(error) return reject(error)
+            if(error) return reject(new Error(error.message))
             resolve({url: resultado.secure_url, publicId: resultado.public_id})
         })
         stream.end(buffer)

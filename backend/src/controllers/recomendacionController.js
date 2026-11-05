@@ -50,4 +50,4 @@ const recomendar = async (req, res) => {
     }
 }
 
-export {recomendar}
+export {recomendar, datosRecurso}
