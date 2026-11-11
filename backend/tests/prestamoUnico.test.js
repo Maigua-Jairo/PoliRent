@@ -4,7 +4,9 @@ import app from '../src/server.js'
 import Usuario from '../src/models/Usuario.js'
 import Recurso from '../src/models/Recurso.js'
 import Prestamo, {mensajePrestamoActivo} from '../src/models/Prestamo.js'
+import Penalizacion from '../src/models/Penalizacion.js'
 import {crearTokenJWT} from '../src/helpers/jwtHelper.js'
+import {consulta} from './ayudantes.js'
 
 // HU-007: un estudiante solo puede tener un prestamo activo a la vez (sin base de datos: los modelos se simulan)
 
@@ -12,7 +14,14 @@ process.env.JWT_SECRET ??= 'secreto-de-prueba'
 
 const ESTUDIANTE = {_id: '64b7f0f2a1b2c3d4e5f60701', rol: 'estudiante', versionSesion: 0, nombres: 'Ana', apellidos: 'Mora'}
 const RECURSO = {_id: '64b7f0f2a1b2c3d4e5f60702', nombre: 'Proyector Epson', estado: 'disponible'}
-const solicitud = {recursoId: RECURSO._id, fechaDevolucion: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), motivo: 'Exposicion'}
+// la solicitud ahora exige aceptar los terminos y un docente de referencia
+const solicitud = {
+    recursoId: RECURSO._id,
+    fechaDevolucion: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
+    motivo: 'Exposicion',
+    aceptaTerminos: true,
+    docenteReferencia: {nombre: 'Carlos Ruiz', correo: 'carlos.ruiz@epn.edu.ec'}
+}
 
 const simularActivo = (prestamo) => jest.spyOn(Prestamo, 'findOne').mockReturnValue({populate: () => Promise.resolve(prestamo)})
 const solicitar = () => request(app)
@@ -20,7 +29,11 @@ const solicitar = () => request(app)
     .set('Authorization', `Bearer ${crearTokenJWT(ESTUDIANTE._id, 'estudiante')}`)
     .send(solicitud)
 
+beforeAll(() => {
+    process.env.VALIDAR_HORARIO = 'false'
+})
 beforeEach(() => {
+    jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([]))
     jest.spyOn(Usuario, 'findById').mockReturnValue({select: () => Promise.resolve(ESTUDIANTE)})
     jest.spyOn(Recurso, 'findById').mockResolvedValue(RECURSO)
     jest.spyOn(Prestamo, 'create').mockResolvedValue({_id: 'nuevo'})

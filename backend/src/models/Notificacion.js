@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose"
 
-const TIPOS_NOTIFICACION = ['solicitud_nueva', 'aprobado', 'rechazado', 'entregado', 'devuelto', 'recordatorio', 'vencido']
+const TIPOS_NOTIFICACION = ['solicitud_nueva', 'aprobado', 'rechazado', 'entregado', 'devuelto', 'recordatorio', 'vencido', 'penalizacion']
 
 const NotificacionSchema = new Schema({
     // a quien se le muestra la notificacion (estudiante o administrador)

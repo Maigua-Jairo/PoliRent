@@ -1,5 +1,7 @@
 import {FACULTADES} from '../models/Usuario.js'
 import {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
+import {ESTADOS_PENALIZACION} from '../models/Penalizacion.js'
+import {CONDICIONES, normalizarFechaDevolucion, limiteMaximoDevolucion, horarioActivo, dentroDeHorario, mensajeHorario} from '../helpers/politicasHelper.js'
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(\s[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*$/
@@ -131,10 +133,20 @@ const validarRestablecerClave = (req, res, next) => {
 // hu002 recursos
 const CATEGORIAS_RECURSO = ['tecnico', 'academico', 'recreativo']
 const ESTADOS_RECURSO = ['disponible', 'prestado', 'mantenimiento']
+const PRECIO_MAXIMO = 100000
+
+// precio de reposicion: numero (o texto numerico, porque en multipart/form-data llega como string) entre 0 y 100000
+const precioValido = (precio) => {
+    if(typeof precio === 'string' && !precio.trim()) return false
+    if(typeof precio !== 'number' && typeof precio !== 'string') return false
+    const numero = Number(precio)
+    return Number.isFinite(numero) && numero >= 0 && numero <= PRECIO_MAXIMO
+}
+const MSG_PRECIO = `El precio debe ser un numero entre 0 y ${PRECIO_MAXIMO}`
 
 // valida los datos recibidos al registrar un recurso
 const validarRecurso = (req, res, next) => {
-    const {nombre, descripcion, categoria, estado, imagen} = req.body
+    const {nombre, descripcion, categoria, estado, imagen, precio} = req.body
     if(!textoValido(nombre) || !textoValido(categoria)){
         return res.status(400).json({msg: 'El nombre y la categoria son obligatorios'})
     }
@@ -153,13 +165,16 @@ const validarRecurso = (req, res, next) => {
     if(imagen !== undefined && typeof imagen !== 'string'){
         return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
     }
+    if(precio !== undefined && !precioValido(precio)){
+        return res.status(400).json({msg: MSG_PRECIO})
+    }
     next()
 }
 
 // valida los datos recibidos al actualizar un recurso (solo los enviados)
 const validarActualizarRecurso = (req, res, next) => {
-    const {nombre, descripcion, categoria, estado, imagen} = req.body
-    if([nombre, descripcion, categoria, estado, imagen].every(v => v === undefined) && !req.file){
+    const {nombre, descripcion, categoria, estado, imagen, precio} = req.body
+    if([nombre, descripcion, categoria, estado, imagen, precio].every(v => v === undefined) && !req.file){
         return res.status(400).json({msg: 'Envia al menos un campo a modificar'})
     }
     if(nombre !== undefined && (!textoValido(nombre) || nombre.trim().length < 3 || nombre.trim().length > 100)){
@@ -176,6 +191,9 @@ const validarActualizarRecurso = (req, res, next) => {
     }
     if(imagen !== undefined && typeof imagen !== 'string'){
         return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
+    }
+    if(precio !== undefined && !precioValido(precio)){
+        return res.status(400).json({msg: MSG_PRECIO})
     }
     next()
 }
@@ -236,25 +254,52 @@ const DIAS_MAX_PRESTAMO = 30
 
 // valida la solicitud de un prestamo
 const validarSolicitudPrestamo = (req, res, next) => {
-    const {recursoId, fechaDevolucion, motivo} = req.body
+    const {recursoId, fechaDevolucion, motivo, aceptaTerminos, docenteReferencia} = req.body
     if(typeof recursoId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(recursoId)){
         return res.status(400).json({msg: 'El id del recurso no es valido'})
     }
-    if(typeof fechaDevolucion !== 'string' || Number.isNaN(Date.parse(fechaDevolucion))){
+    // "AAAA-MM-DD" se toma a la hora de fin del horario (18:00 de Ecuador); tambien se acepta fecha con hora
+    const fecha = typeof fechaDevolucion === 'string' ? normalizarFechaDevolucion(fechaDevolucion) : null
+    if(!fecha){
         return res.status(400).json({msg: 'La fecha de devolucion no es valida'})
     }
-    const fecha = new Date(fechaDevolucion)
     const ahora = new Date()
     if(fecha <= ahora){
         return res.status(400).json({msg: 'La fecha de devolucion debe ser posterior a hoy'})
     }
-    if(fecha - ahora > DIAS_MAX_PRESTAMO * 24 * 60 * 60 * 1000){
+    // el limite se cuenta por dias calendario (hasta el final del dia "hoy + 30")
+    if(fecha > limiteMaximoDevolucion(DIAS_MAX_PRESTAMO, ahora)){
         return res.status(400).json({msg: `El prestamo no puede superar los ${DIAS_MAX_PRESTAMO} dias`})
+    }
+    if(horarioActivo() && !dentroDeHorario(fecha)){
+        return res.status(400).json({msg: mensajeHorario()})
     }
     if(motivo !== undefined && (typeof motivo !== 'string' || motivo.length > 300)){
         return res.status(400).json({msg: 'El motivo debe ser texto de maximo 300 caracteres'})
     }
+    if(aceptaTerminos !== true && aceptaTerminos !== 'true'){
+        return res.status(400).json({msg: 'Debes aceptar los terminos y condiciones'})
+    }
+    const error = errorDocenteReferencia(docenteReferencia)
+    if(error){
+        return res.status(400).json({msg: error})
+    }
+    req.body.fechaDevolucion = fecha
     next()
+}
+
+// docente de referencia: nombre (3-100) y correo obligatorios; telefono opcional
+const errorDocenteReferencia = (docente) => {
+    if(!docente || typeof docente !== 'object' || Array.isArray(docente) || !textoValido(docente.nombre) || !textoValido(docente.correo)){
+        return 'El docente de referencia es obligatorio (nombre y correo)'
+    }
+    const nombre = docente.nombre.trim()
+    if(nombre.length < 3 || nombre.length > 100) return 'El nombre del docente debe tener entre 3 y 100 caracteres'
+    if(docente.correo.trim().length > 100 || !REGEX_CORREO.test(docente.correo.trim())) return 'El correo del docente no es valido'
+    if(docente.telefono !== undefined && docente.telefono !== null && docente.telefono !== ''){
+        if(typeof docente.telefono !== 'string' || !/^[\d+\- ]{7,15}$/.test(docente.telefono.trim())) return 'El telefono del docente no es valido'
+    }
+    return ''
 }
 
 // valida que el id de la ruta sea un ObjectId de MongoDB
@@ -284,6 +329,22 @@ const validarEscaneo = (req, res, next) => {
     next()
 }
 
+// datos opcionales de la entrega o la devolucion (JSON o multipart/form-data)
+const validarMovimiento = (req, res, next) => {
+    const {responsable, observaciones, condicion} = req.body ?? {}
+    if(responsable !== undefined && responsable !== ''
+        && (typeof responsable !== 'string' || responsable.trim().length < 3 || responsable.trim().length > 100)){
+        return res.status(400).json({msg: 'El responsable debe tener entre 3 y 100 caracteres'})
+    }
+    if(observaciones !== undefined && (typeof observaciones !== 'string' || observaciones.length > 300)){
+        return res.status(400).json({msg: 'Las observaciones deben ser texto de maximo 300 caracteres'})
+    }
+    if(condicion !== undefined && condicion !== '' && !CONDICIONES.includes(condicion)){
+        return res.status(400).json({msg: `La condicion debe ser: ${CONDICIONES.join(', ')}`})
+    }
+    next()
+}
+
 // hu004 / hu008 / hu010 reportes, historial y notificaciones
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
 const fechaReal = (texto) => typeof texto === 'string' && FECHA_ISO.test(texto) && !Number.isNaN(Date.parse(texto))
@@ -306,6 +367,46 @@ const validarFiltrosReporte = (req, res, next) => {
     }
     if(formato !== undefined && !['json', 'csv'].includes(formato)){
         return res.status(400).json({msg: 'El formato debe ser json o csv'})
+    }
+    next()
+}
+
+// penalizaciones: ?estado ?usuario (ObjectId) ?desde ?hasta (AAAA-MM-DD) y ?formato=json|csv
+const validarFiltrosPenalizaciones = (req, res, next) => {
+    const {estado, usuario, desde, hasta, formato} = req.query
+    if(estado !== undefined && (typeof estado !== 'string' || !ESTADOS_PENALIZACION.includes(estado))){
+        return res.status(400).json({msg: `El estado debe ser: ${ESTADOS_PENALIZACION.join(', ')}`})
+    }
+    if(usuario !== undefined && (typeof usuario !== 'string' || !/^[0-9a-fA-F]{24}$/.test(usuario))){
+        return res.status(400).json({msg: 'El id del usuario no es valido'})
+    }
+    if(desde !== undefined && !fechaReal(desde)){
+        return res.status(400).json({msg: 'La fecha "desde" debe tener el formato AAAA-MM-DD'})
+    }
+    if(hasta !== undefined && !fechaReal(hasta)){
+        return res.status(400).json({msg: 'La fecha "hasta" debe tener el formato AAAA-MM-DD'})
+    }
+    if(desde !== undefined && hasta !== undefined && desde > hasta){
+        return res.status(400).json({msg: 'La fecha "desde" no puede ser posterior a "hasta"'})
+    }
+    if(formato !== undefined && !['json', 'csv'].includes(formato)){
+        return res.status(400).json({msg: 'El formato debe ser json o csv'})
+    }
+    next()
+}
+
+const validarIdPenalizacion = (req, res, next) => {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)){
+        return res.status(400).json({msg: 'El id de la penalizacion no es valido'})
+    }
+    next()
+}
+
+// motivo obligatorio al anular una penalizacion (por ejemplo: el estudiante repuso el articulo)
+const validarAnulacion = (req, res, next) => {
+    const motivo = req.body?.motivo
+    if(!textoValido(motivo) || motivo.trim().length < 3 || motivo.trim().length > 200){
+        return res.status(400).json({msg: 'El motivo de la anulacion debe tener entre 3 y 200 caracteres'})
     }
     next()
 }
@@ -342,5 +443,5 @@ const validarEliminarCuenta = (req, res, next) => {
 }
 
 export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion, validarMensajeAsistente,
-        validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo,
-        validarFiltrosReporte, validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}
+        validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo, validarMovimiento,
+        validarFiltrosReporte, validarFiltrosPenalizaciones, validarIdPenalizacion, validarAnulacion, validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}

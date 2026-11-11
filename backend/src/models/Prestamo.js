@@ -1,4 +1,5 @@
 import { Schema, model } from "mongoose"
+import {CONDICIONES} from '../helpers/politicasHelper.js'
 
 const ESTADOS_PRESTAMO = ['pendiente', 'aprobado', 'rechazado', 'cancelado', 'entregado', 'devuelto']
 
@@ -44,7 +45,33 @@ const PrestamoSchema = new Schema({
         ref: 'Usuario'
     },
     fechaEntrega: Date,
-    fechaDevolucionReal: Date
+    fechaDevolucionReal: Date,
+    // version de los terminos y condiciones que el estudiante acepto al solicitar
+    terminos:{
+        version: String,
+        aceptadoEn: Date
+    },
+    // docente al que la asociacion contacta si el estudiante no devuelve el recurso (solo lo ve el administrador)
+    docenteReferencia:{
+        nombre: {type: String, trim: true},
+        correo: {type: String, trim: true},
+        telefono: {type: String, trim: true}
+    },
+    // quien entrego el recurso y la evidencia opcional
+    entrega:{
+        responsable: {type: Schema.Types.ObjectId, ref: 'Usuario'},
+        responsableNombre: String,
+        observaciones: String,
+        evidencia: {url: String, publicId: String}
+    },
+    // quien recibio el recurso, en que condicion volvio y la evidencia
+    devolucion:{
+        responsable: {type: Schema.Types.ObjectId, ref: 'Usuario'},
+        responsableNombre: String,
+        observaciones: String,
+        condicion: {type: String, enum: CONDICIONES},
+        evidencia: {url: String, publicId: String}
+    }
 },{
     timestamps: true
 })
@@ -60,5 +87,5 @@ const mensajePrestamoActivo = (estado, nombreRecurso) => {
         : `Ya tienes un prestamo en curso${recurso}. Devuelvelo antes de solicitar otro recurso`
 }
 
-export {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, mensajePrestamoActivo}
+export {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, CONDICIONES, mensajePrestamoActivo}
 export default model('Prestamo', PrestamoSchema)

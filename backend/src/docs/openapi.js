@@ -1,8 +1,9 @@
 // Especificacion OpenAPI 3 de la API de PoliRent. Se publica con Swagger UI en /api-docs (ver server.js)
 import {FACULTADES} from '../models/Usuario.js'
 import {CATEGORIAS, ESTADOS} from '../models/Recurso.js'
-import {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
+import {ESTADOS_PRESTAMO, CONDICIONES} from '../models/Prestamo.js'
 import {TIPOS_NOTIFICACION} from '../models/Notificacion.js'
+import {TIPOS_PENALIZACION, ESTADOS_PENALIZACION} from '../models/Penalizacion.js'
 
 const ID_EJEMPLO = '64b7f0f2a1b2c3d4e5f60718'
 const ID_SCHEMA = {type: 'string', pattern: '^[0-9a-fA-F]{24}$', example: ID_EJEMPLO}
@@ -19,6 +20,45 @@ const query = (name, description, schema, example) => ({name, in: 'query', requi
 // respuestas de seguridad que se repiten
 const r401 = error('Sin token, token invalido o sesion cerrada', 'Acceso denegado: token no proporcionado')
 const r403 = error('El rol del usuario no tiene permiso para esta accion', 'Acceso denegado: no tienes permisos para esta accion')
+
+const formato = query('formato', 'json (por defecto) o csv', {type: 'string', enum: ['json', 'csv'], default: 'json'})
+const MSG_HORARIO = 'La entrega y la devolucion solo se registran entre las 07:00 y las 18:00 (hora de Ecuador)'
+const r503Cloudinary = error('Se envio una evidencia y Cloudinary no esta configurado', 'La subida de imagenes no esta disponible: falta configurar Cloudinary')
+
+// campos de la entrega / devolucion (JSON o multipart/form-data con la foto en "evidencia")
+const camposMovimiento = (conCondicion, conCodigo = false) => {
+    const propiedades = {
+        ...(conCodigo ? {codigo: {type: 'string', pattern: '^[0-9a-fA-F]{32}$', description: 'Texto de 32 caracteres leido del QR', example: '9f86d081884c7d659a2feaa0c55ad015'}} : {}),
+        responsable: {type: 'string', minLength: 3, maxLength: 100, description: 'Quien entrega o recibe fisicamente el recurso. Por defecto, nombres y apellidos del administrador autenticado', example: 'Maria Lopez'},
+        observaciones: {type: 'string', maxLength: 300, example: 'Se entrega con cable HDMI y control remoto'},
+        ...(conCondicion ? {condicion: {type: 'string', enum: CONDICIONES, default: 'bueno', description: 'Solo en la devolucion. `danado` e `incompleto` exigen la foto de evidencia'}} : {})
+    }
+    const requeridos = conCodigo ? ['codigo'] : []
+    return {required: conCodigo, content: {
+        'application/json': {schema: {type: 'object', required: requeridos, properties: propiedades}},
+        'multipart/form-data': {schema: {type: 'object', required: requeridos, properties: {
+            ...propiedades,
+            evidencia: {type: 'string', format: 'binary', description: 'Foto de evidencia (JPG, PNG o WEBP, maximo 2 MB)'}
+        }}}
+    }}
+}
+
+// respuesta de la entrega (como siempre) o de la devolucion (con penalizaciones)
+const respuestaMovimiento = {type: 'object', properties: {
+    msg: {type: 'string'}, accion: {type: 'string', enum: ['entrega', 'devolucion']}, prestamo: ref('Prestamo'),
+    recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}, estado: {type: 'string', enum: ESTADOS}}},
+    penalizaciones: {type: 'array', items: ref('Penalizacion'), description: 'Solo en la devolucion'},
+    totalPenalizado: {type: 'number', description: 'Solo en la devolucion', example: 10},
+    advertencias: {type: 'array', items: {type: 'string'}, description: 'Solo en la devolucion', example: ['El recurso no tiene precio registrado: no se generaron penalizaciones']}
+}}
+
+const reglasMovimiento = [
+    '- Solo entre las **07:00 y las 18:00 (hora de Ecuador)** (`HORARIO_INICIO`, `HORARIO_FIN`; `VALIDAR_HORARIO=false` lo desactiva). Declarar una perdida (`condicion: perdido`) no valida el horario.',
+    '- Se guarda quien entrega o recibe (`responsable`, por defecto el administrador), `observaciones` y la foto opcional `evidencia` (obligatoria al devolver `danado` o `incompleto`).',
+    '- **Entrega**: `aprobado` pasa a `entregado` y el recurso a `prestado`.',
+    '- **Devolucion**: `entregado` pasa a `devuelto` y el codigo QR se elimina. El recurso vuelve a `disponible` si la condicion es `bueno` y queda en `mantenimiento` en cualquier otro caso.',
+    '  Se crean las penalizaciones segun el precio del recurso (valores por defecto, ver GET /api/terminos): atraso 5 % por dia o fraccion, dano/incompleto 20 %, perdida 100 % (sin sumar atraso), con un tope del 100 % del precio por prestamo. Se notifica al estudiante.'
+].join('\n')
 
 const filtrosFechas = [
     query('desde', 'Fecha inicial (AAAA-MM-DD), se compara con la fecha de la solicitud', {type: 'string', format: 'date'}, '2026-10-01'),
@@ -52,6 +92,7 @@ export default {
         {name: 'Prestamos - Administrador (HU-003)', description: 'Revisar, aprobar, rechazar y escanear el QR de entrega y devolucion'},
         {name: 'Metricas y reportes (HU-004)', description: 'Consultas de solo lectura para el administrador'},
         {name: 'Notificaciones (HU-010)', description: 'Avisos sobre el estado de los prestamos'},
+        {name: 'Penalizaciones', description: 'Terminos y condiciones, penalizaciones por atraso, dano o perdida, pago y anulacion'},
         {name: 'Usuarios', description: 'Consulta y eliminacion de usuarios'}
     ],
     components: {
@@ -83,8 +124,60 @@ export default {
                     etiquetas: {type: 'array', items: {type: 'string'}, example: ['sensores', 'distancia', 'robotica']},
                     estado: {type: 'string', enum: ESTADOS},
                     imagen: {type: 'string', example: 'https://res.cloudinary.com/.../recurso.jpg'},
+                    precio: {type: 'number', minimum: 0, maximum: 100000, default: 0, description: 'Precio de reposicion en dolares: base de las penalizaciones', example: 45},
                     createdAt: {type: 'string', format: 'date-time'},
                     updatedAt: {type: 'string', format: 'date-time'}
+                }
+            },
+            DocenteReferencia: {
+                type: 'object',
+                description: 'Docente al que la asociacion contacta si el estudiante no devuelve el recurso (no se le envia correo)',
+                required: ['nombre', 'correo'],
+                properties: {
+                    nombre: {type: 'string', minLength: 3, maxLength: 100, example: 'Carlos Ruiz'},
+                    correo: {type: 'string', format: 'email', example: 'carlos.ruiz@epn.edu.ec'},
+                    telefono: {type: 'string', pattern: '^[0-9+\\- ]{7,15}$', description: 'Opcional', example: '0991234567'}
+                }
+            },
+            Movimiento: {
+                type: 'object',
+                nullable: true,
+                description: 'Entrega o devolucion registrada (null si aun no ocurre)',
+                properties: {
+                    responsable: {...ID_SCHEMA, description: 'Id del administrador que la registro'},
+                    responsableNombre: {type: 'string', example: 'Maria Lopez'},
+                    observaciones: {type: 'string'},
+                    condicion: {type: 'string', enum: CONDICIONES, description: 'Solo en la devolucion'},
+                    evidencia: {type: 'object', nullable: true, properties: {url: {type: 'string', example: 'https://res.cloudinary.com/.../evidencia.jpg'}}}
+                }
+            },
+            Penalizacion: {
+                type: 'object',
+                properties: {
+                    _id: ID_SCHEMA,
+                    tipo: {type: 'string', enum: TIPOS_PENALIZACION},
+                    monto: {type: 'number', description: 'En dolares, con 2 decimales', example: 9},
+                    dias: {type: 'integer', description: 'Solo en el atraso: dias o fraccion de dia', example: 2},
+                    descripcion: {type: 'string', example: 'Atraso de 2 dia(s) en la devolucion'},
+                    estado: {type: 'string', enum: ESTADOS_PENALIZACION},
+                    fechaPago: {type: 'string', format: 'date-time', nullable: true},
+                    motivoAnulacion: {type: 'string', example: 'El estudiante repuso el articulo'},
+                    usuario: {description: 'Id del estudiante, o sus datos cuando lo consulta el administrador', oneOf: [ID_SCHEMA, ref('Usuario')]},
+                    recurso: {description: 'Id o datos basicos del recurso', oneOf: [ID_SCHEMA, ref('Recurso')]},
+                    prestamo: {description: 'Id o datos basicos del prestamo', oneOf: [ID_SCHEMA, {type: 'object'}]},
+                    createdAt: {type: 'string', format: 'date-time'},
+                    updatedAt: {type: 'string', format: 'date-time'}
+                }
+            },
+            Terminos: {
+                type: 'object',
+                properties: {
+                    version: {type: 'string', example: '1.0'},
+                    tarifas: {type: 'object', description: 'Porcentajes del precio del recurso', properties: {
+                        atrasoPorDia: {type: 'number', example: 5}, danio: {type: 'number', example: 20}, perdida: {type: 'number', example: 100}, tope: {type: 'number', example: 100}
+                    }},
+                    horario: {type: 'object', properties: {inicio: {type: 'string', example: '07:00'}, fin: {type: 'string', example: '18:00'}, zona: {type: 'string', example: 'America/Guayaquil'}}},
+                    condiciones: {type: 'array', items: {type: 'string'}, example: ['Si el recurso se devuelve danado o incompleto, pagaras el 20 % de su precio.']}
                 }
             },
             Prestamo: {
@@ -98,6 +191,10 @@ export default {
                     fechaEntrega: {type: 'string', format: 'date-time'},
                     fechaDevolucionReal: {type: 'string', format: 'date-time'},
                     motivoRechazo: {type: 'string'},
+                    terminos: {type: 'object', nullable: true, description: 'Terminos aceptados al solicitar', properties: {version: {type: 'string', example: '1.0'}, aceptadoEn: {type: 'string', format: 'date-time'}}},
+                    docenteReferencia: {...ref('DocenteReferencia'), nullable: true},
+                    entrega: ref('Movimiento'),
+                    devolucion: ref('Movimiento'),
                     usuario: {description: 'Id del estudiante, o sus datos cuando lo consulta el administrador', oneOf: [ID_SCHEMA, ref('Usuario')]},
                     recurso: {description: 'Id del recurso, o sus datos basicos cuando se consulta una lista', oneOf: [ID_SCHEMA, ref('Recurso')]},
                     createdAt: {type: 'string', format: 'date-time'},
@@ -276,7 +373,8 @@ export default {
                             categoria: {type: 'string', enum: CATEGORIAS},
                             etiquetas: {type: 'array', maxItems: 10, items: {type: 'string', minLength: 2, maxLength: 30}, example: ['sensores', 'distancia', 'robotica']},
                             estado: {type: 'string', enum: ESTADOS, default: 'disponible'},
-                            imagen: {type: 'string', description: 'URL de una imagen ya publicada (alternativa a subir archivo)'}
+                            imagen: {type: 'string', description: 'URL de una imagen ya publicada (alternativa a subir archivo)'},
+                            precio: {type: 'number', minimum: 0, maximum: 100000, description: 'Precio de reposicion en dolares (base de las penalizaciones)', example: 45}
                         }
                     }},
                     'multipart/form-data': {schema: {
@@ -286,13 +384,14 @@ export default {
                             categoria: {type: 'string', enum: CATEGORIAS},
                             etiquetas: {type: 'string', description: 'Separadas por comas', example: 'robotica,arduino'},
                             estado: {type: 'string', enum: ESTADOS},
+                            precio: {type: 'string', description: 'Numero entre 0 y 100000', example: '45'},
                             imagen: {type: 'string', format: 'binary'}
                         }
                     }}
                 }},
                 responses: {
                     201: ok('Recurso creado', {type: 'object', properties: {msg: {type: 'string'}, recurso: ref('Recurso')}}),
-                    400: error('Datos invalidos o recurso repetido', 'Ya existe un recurso con ese nombre en la categoria'),
+                    400: error('Datos invalidos (incluido un precio fuera de 0-100000) o recurso repetido', 'Ya existe un recurso con ese nombre en la categoria'),
                     401: r401, 403: r403,
                     503: error('Cloudinary no configurado', 'La subida de imagenes no esta disponible: falta configurar Cloudinary')
                 }
@@ -314,7 +413,8 @@ export default {
                         properties: {
                             nombre: {type: 'string'}, descripcion: {type: 'string'}, categoria: {type: 'string', enum: CATEGORIAS},
                             etiquetas: {type: 'array', items: {type: 'string'}, example: ['arduino', 'robotica']},
-                            estado: {type: 'string', enum: ESTADOS}, imagen: {type: 'string'}
+                            estado: {type: 'string', enum: ESTADOS}, imagen: {type: 'string'},
+                            precio: {type: 'number', minimum: 0, maximum: 100000, example: 45}
                         }
                     }},
                     'multipart/form-data': {schema: {
@@ -322,6 +422,7 @@ export default {
                         properties: {
                             nombre: {type: 'string'}, descripcion: {type: 'string'}, categoria: {type: 'string', enum: CATEGORIAS},
                             etiquetas: {type: 'string', example: 'arduino,robotica'}, estado: {type: 'string', enum: ESTADOS},
+                            precio: {type: 'string', example: '45'},
                             imagen: {type: 'string', format: 'binary'}
                         }
                     }}
@@ -378,7 +479,7 @@ export default {
                 description: [
                     'Un solo chat que atiende dos temas y rechaza el resto:',
                     '',
-                    '- **ayuda**: dudas sobre el uso de PoliRent (registro, inicio y cierre de sesion, contraseña, reservas, plazo, prestamo unico, cancelar, retiro y devolucion...). Trae `enlaces` a las pantallas del frontend.',
+                    '- **ayuda**: dudas sobre el uso de PoliRent (registro, inicio y cierre de sesion, contraseña, reservas, plazo, prestamo unico, cancelar, retiro y devolucion, horario, penalizaciones...). Trae `enlaces` a las pantallas del frontend. A un estudiante que pregunta \"¿cuanto debo?\" le responde con sus penalizaciones pendientes y su atraso en curso (sin consultar a Gemini).',
                     '- **recomendacion**: el usuario describe su proyecto o actividad y recibe recursos **disponibles** del catalogo en `recomendaciones` (mismo formato que `POST /api/recomendaciones`).',
                     '- **fuera_de_tema**: cualquier otra pregunta; responde que solo ayuda con PoliRent y recursos.',
                     '',
@@ -421,18 +522,30 @@ export default {
         '/api/prestamos': {
             post: {
                 tags: ['Prestamos - Estudiante (HU-007, HU-008)'], summary: 'Solicitar un prestamo (estudiante)', operationId: 'solicitarPrestamo', security: conToken,
-                description: 'El recurso debe estar `disponible` y el estudiante no puede tener ningun otro prestamo activo (`pendiente`, `aprobado` o `entregado`): solo se permite uno a la vez. La fecha de devolucion debe ser futura y de maximo 30 dias. Se notifica a los administradores.',
+                description: [
+                    'El recurso debe estar `disponible` y el estudiante no puede tener ningun otro prestamo activo (`pendiente`, `aprobado` o `entregado`): solo se permite uno a la vez. Se notifica a los administradores.',
+                    '',
+                    '- `fechaDevolucion`: `AAAA-MM-DD` (se toma a las 18:00 de Ecuador, el fin del horario) o fecha con hora. Debe ser futura, no superar el final del dia `hoy + 30` (dias calendario) y su hora debe caer entre las 07:00 y las 18:00 (hora de Ecuador).',
+                    '- `aceptaTerminos` debe ser `true` (ver `GET /api/terminos`). Se guarda la version aceptada.',
+                    '- `docenteReferencia` es obligatorio. Solo lo ve el administrador para contactarlo si el estudiante no devuelve el recurso.',
+                    '- Un estudiante con **penalizaciones pendientes** no puede solicitar (400 con el monto).'
+                ].join('\n'),
                 requestBody: {required: true, content: json({
-                    type: 'object', required: ['recursoId', 'fechaDevolucion'],
+                    type: 'object', required: ['recursoId', 'fechaDevolucion', 'aceptaTerminos', 'docenteReferencia'],
                     properties: {
                         recursoId: ID_SCHEMA,
-                        fechaDevolucion: {type: 'string', format: 'date', example: '2026-11-05'},
-                        motivo: {type: 'string', maxLength: 300, example: 'Proyecto de robotica'}
+                        fechaDevolucion: {type: 'string', description: 'AAAA-MM-DD o fecha con hora (ISO 8601)', example: '2026-11-20'},
+                        motivo: {type: 'string', maxLength: 300, example: 'Proyecto de robotica'},
+                        aceptaTerminos: {type: 'boolean', enum: [true], description: 'Tambien se acepta el texto "true"', example: true},
+                        docenteReferencia: ref('DocenteReferencia')
                     }
+                }, {
+                    recursoId: ID_EJEMPLO, fechaDevolucion: '2026-11-20', motivo: 'Proyecto de robotica', aceptaTerminos: true,
+                    docenteReferencia: {nombre: 'Carlos Ruiz', correo: 'carlos.ruiz@epn.edu.ec', telefono: '0991234567'}
                 })},
                 responses: {
                     201: ok('Solicitud creada en estado pendiente', {type: 'object', properties: {msg: {type: 'string'}, prestamo: ref('Prestamo')}}),
-                    400: error('Datos invalidos, recurso no disponible o el estudiante ya tiene un prestamo activo', 'Ya tienes un prestamo en curso (Camara reflex). Devuelvelo antes de solicitar otro recurso'),
+                    400: error('Datos invalidos, terminos sin aceptar, sin docente, fuera de horario, recurso no disponible, prestamo activo o penalizaciones pendientes', 'Tienes penalizaciones pendientes por $9.00. Regularizalas con la asociacion antes de solicitar otro recurso'),
                     401: r401, 403: r403, 404: error('Recurso inexistente', 'Recurso no encontrado')
                 }
             },
@@ -478,6 +591,18 @@ export default {
                 }
             }
         },
+        '/api/prestamos/{id}': {
+            get: {
+                tags: ['Prestamos - Estudiante (HU-007, HU-008)'], summary: 'Ver un prestamo (dueño o administrador)', operationId: 'detallePrestamo', security: conToken,
+                description: 'Sirve para consultar el prestamo durante la entrega o la devolucion. El estudiante solo ve los suyos; el administrador recibe ademas los datos del estudiante. `recurso` incluye `precio`.',
+                parameters: [idRuta('Id del prestamo')],
+                responses: {
+                    200: ok('Detalle del prestamo', {type: 'object', properties: {prestamo: ref('Prestamo')}}),
+                    400: error('Id invalido', 'El id de la solicitud no es valido'),
+                    401: r401, 404: error('No existe o no te pertenece', 'Solicitud no encontrada')
+                }
+            }
+        },
         '/api/prestamos/{id}/qr': {
             get: {
                 tags: ['Prestamos - Estudiante (HU-007, HU-008)'], summary: 'Ver el QR de un prestamo aprobado', operationId: 'verQR', security: conToken,
@@ -519,18 +644,46 @@ export default {
         '/api/prestamos/escanear': {
             post: {
                 tags: ['Prestamos - Administrador (HU-003)'], summary: 'Escanear el QR: registra entrega o devolucion (administrador)', operationId: 'escanearQR', security: conToken,
-                description: 'El estado del prestamo decide la accion:\n\n- `aprobado` pasa a `entregado` y el recurso a `prestado`.\n- `entregado` pasa a `devuelto`, el recurso vuelve a `disponible` y el codigo se elimina (un QR usado ya no sirve).',
-                requestBody: {required: true, content: json({
-                    type: 'object', required: ['codigo'],
-                    properties: {codigo: {type: 'string', pattern: '^[0-9a-fA-F]{32}$', description: 'Texto de 32 caracteres leido del QR', example: '9f86d081884c7d659a2feaa0c55ad015'}}
-                })},
+                description: `El estado del prestamo decide la accion (un QR usado ya no sirve). Acepta JSON o \`multipart/form-data\` (para adjuntar la foto en \`evidencia\`). Misma logica que \`PUT /api/prestamos/{id}/entregar\` y \`/devolver\`:\n\n${reglasMovimiento}`,
+                requestBody: camposMovimiento(true, true),
                 responses: {
-                    200: ok('Entrega o devolucion registrada', {type: 'object', properties: {
-                        msg: {type: 'string'}, accion: {type: 'string', enum: ['entrega', 'devolucion']}, prestamo: ref('Prestamo'),
-                        recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}, estado: {type: 'string', enum: ESTADOS}}}
-                    }}),
-                    400: error('Codigo con formato invalido o prestamo en un estado que no permite escanear', 'El codigo QR no es valido'),
-                    401: r401, 403: r403, 404: error('Codigo inexistente o ya usado', 'Codigo QR no valido')
+                    200: ok('Entrega o devolucion registrada', respuestaMovimiento),
+                    400: error('Codigo o datos invalidos, estado que no permite escanear, falta la evidencia o fuera de horario', MSG_HORARIO),
+                    401: r401, 403: r403, 404: error('Codigo inexistente o ya usado', 'Codigo QR no valido'),
+                    503: r503Cloudinary
+                }
+            }
+        },
+        '/api/prestamos/{id}/entregar': {
+            put: {
+                tags: ['Prestamos - Administrador (HU-003)'], summary: 'Registrar la entrega de un prestamo aprobado (administrador)', operationId: 'entregarPrestamo', security: conToken,
+                description: `Alternativa al escaneo del QR. El prestamo debe estar \`aprobado\` y el recurso \`disponible\`. JSON o \`multipart/form-data\`.\n\n${reglasMovimiento}`,
+                parameters: [idRuta('Id del prestamo')],
+                requestBody: camposMovimiento(false),
+                responses: {
+                    200: ok('Entrega registrada', respuestaMovimiento),
+                    400: error('Id o datos invalidos, prestamo no aprobado o fuera de horario', 'Solo se puede registrar la entrega de una solicitud aprobada (la solicitud esta pendiente)'),
+                    401: r401, 403: r403, 404: error('No existe', 'Solicitud no encontrada'),
+                    503: r503Cloudinary
+                }
+            }
+        },
+        '/api/prestamos/{id}/devolver': {
+            put: {
+                tags: ['Prestamos - Administrador (HU-003)'], summary: 'Registrar la devolucion de un prestamo entregado (administrador)', operationId: 'devolverPrestamo', security: conToken,
+                description: `Alternativa al escaneo del QR. El prestamo debe estar \`entregado\`. JSON o \`multipart/form-data\`.\n\n${reglasMovimiento}`,
+                parameters: [idRuta('Id del prestamo')],
+                requestBody: camposMovimiento(true),
+                responses: {
+                    200: ok('Devolucion registrada', respuestaMovimiento, {
+                        msg: 'Devolucion registrada correctamente', accion: 'devolucion',
+                        recurso: {_id: ID_EJEMPLO, nombre: 'Kit Arduino Uno', estado: 'disponible'},
+                        penalizaciones: [{_id: ID_EJEMPLO, tipo: 'atraso', monto: 4.5, dias: 2, descripcion: 'Atraso de 2 dia(s) en la devolucion', estado: 'pendiente'}],
+                        totalPenalizado: 4.5, advertencias: []
+                    }),
+                    400: error('Id o datos invalidos, prestamo no entregado, falta la evidencia o fuera de horario', 'Adjunta una foto de evidencia del estado del recurso'),
+                    401: r401, 403: r403, 404: error('No existe', 'Solicitud no encontrada'),
+                    503: r503Cloudinary
                 }
             }
         },
@@ -554,6 +707,20 @@ export default {
                             usoPorCategoria: {type: 'object', additionalProperties: {type: 'integer'}},
                             masPrestados: {type: 'array', items: {type: 'object', properties: {
                                 recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}, categoria: {type: 'string'}}}, veces: {type: 'integer'}
+                            }}},
+                            penalizaciones: {type: 'object', properties: {
+                                pendientes: {type: 'object', properties: {cantidad: {type: 'integer'}, monto: {type: 'number'}}},
+                                pagadas: {type: 'object', properties: {cantidad: {type: 'integer'}, monto: {type: 'number'}}},
+                                anuladas: {type: 'object', properties: {cantidad: {type: 'integer'}}},
+                                montoPorTipo: {type: 'object', description: 'Monto no anulado por tipo', properties: {atraso: {type: 'number'}, danio: {type: 'number'}, perdida: {type: 'number'}}}
+                            }},
+                            recursosParaReponer: {type: 'array', maxItems: 10, description: 'Recursos que necesitan reposicion o ampliar inventario, de mas a menos urgente', items: {type: 'object', properties: {
+                                recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}, categoria: {type: 'string', enum: CATEGORIAS}, estado: {type: 'string', enum: ESTADOS}}},
+                                vecesPrestado: {type: 'integer'},
+                                ocupacion30Dias: {type: 'number', description: 'Porcentaje (0-100) de los ultimos 30 dias que estuvo entregado', example: 72.5},
+                                incidentes: {type: 'integer', description: 'Devoluciones en condicion distinta de bueno'},
+                                razones: {type: 'array', items: {type: 'string', enum: ['perdido', 'danos_frecuentes', 'alta_demanda', 'en_mantenimiento']},
+                                    description: 'alta_demanda: ocupacion >= 60 %; danos_frecuentes: al menos una devolucion danado/incompleto; perdido: al menos una perdida; en_mantenimiento: estado actual'}
                             }}}
                         }
                     }),
@@ -564,7 +731,7 @@ export default {
         '/api/reportes/prestamos': {
             get: {
                 tags: ['Metricas y reportes (HU-004)'], summary: 'Reporte de prestamos (administrador)', operationId: 'reportePrestamos', security: conToken,
-                description: 'Lista de prestamos con datos del estudiante y del recurso. Con `formato=csv` se descarga un archivo que abre en Excel.',
+                description: 'Lista de prestamos con datos del estudiante y del recurso, el docente de referencia, quien entrego y recibio, la condicion al devolver, las URL de las evidencias y la suma de penalizaciones no anuladas (`penalizacionTotal`). Con `formato=csv` se descarga un archivo que abre en Excel.',
                 parameters: [
                     ...filtrosFechas,
                     query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PRESTAMO}),
@@ -582,7 +749,7 @@ export default {
         '/api/reportes/recursos': {
             get: {
                 tags: ['Metricas y reportes (HU-004)'], summary: 'Reporte de frecuencia de uso por recurso (administrador)', operationId: 'reporteRecursos', security: conToken,
-                description: 'Cuantas veces se solicito y se presto cada recurso, ordenado del mas al menos usado.',
+                description: 'Cuantas veces se solicito y se presto cada recurso, su precio, las devoluciones con incidente y el monto penalizado (no anulado), ordenado del mas al menos usado.',
                 parameters: [
                     ...filtrosFechas,
                     query('formato', 'json (por defecto) o csv', {type: 'string', enum: ['json', 'csv'], default: 'json'})
@@ -590,7 +757,8 @@ export default {
                 responses: {
                     200: {description: 'Reporte en JSON o CSV', content: {
                         'application/json': {schema: {type: 'object', properties: {desde: {type: 'string', nullable: true}, hasta: {type: 'string', nullable: true}, total: {type: 'integer'}, recursos: {type: 'array', items: {type: 'object', properties: {
-                            recurso: {type: 'string'}, categoria: {type: 'string'}, estado: {type: 'string'}, solicitudes: {type: 'integer'}, vecesPrestado: {type: 'integer'}, ultimaEntrega: {type: 'string', format: 'date-time', nullable: true}
+                            recurso: {type: 'string'}, categoria: {type: 'string'}, estado: {type: 'string'}, precio: {type: 'number'}, solicitudes: {type: 'integer'}, vecesPrestado: {type: 'integer'},
+                            ultimaEntrega: {type: 'string', format: 'date-time', nullable: true}, incidentes: {type: 'integer'}, penalizado: {type: 'number'}
                         }}}}}},
                         'text/csv': {schema: {type: 'string'}}
                     }},
@@ -599,11 +767,103 @@ export default {
             }
         },
 
+        '/api/reportes/penalizaciones': {
+            get: {
+                tags: ['Metricas y reportes (HU-004)'], summary: 'Reporte de penalizaciones (administrador)', operationId: 'reportePenalizaciones', security: conToken,
+                description: 'Una fila por penalizacion: estudiante, cedula, correo, recurso, tipo, monto, dias, estado, fecha de registro, fecha de pago y motivo de anulacion. Con `formato=csv` se descarga.',
+                parameters: [
+                    ...filtrosFechas,
+                    query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION}),
+                    formato
+                ],
+                responses: {
+                    200: {description: 'Reporte en JSON o CSV', content: {
+                        'application/json': {schema: {type: 'object', properties: {
+                            desde: {type: 'string', nullable: true}, hasta: {type: 'string', nullable: true}, estado: {type: 'string', nullable: true},
+                            total: {type: 'integer'}, totalMonto: {type: 'number', description: 'Suma de las no anuladas'}, penalizaciones: {type: 'array', items: {type: 'object'}}
+                        }}},
+                        'text/csv': {schema: {type: 'string'}}
+                    }},
+                    400: error('Filtro invalido', 'El estado debe ser: pendiente, pagada, anulada'), 401: r401, 403: r403
+                }
+            }
+        },
+
+        // ---------------- Penalizaciones ----------------
+        '/api/terminos': {
+            get: {
+                tags: ['Penalizaciones'], summary: 'Terminos y condiciones (publico)', operationId: 'verTerminos',
+                description: 'Tarifas (porcentajes del precio del recurso), horario de entrega y devolucion y las condiciones que el estudiante acepta al solicitar (`aceptaTerminos`). Los valores salen de las variables `PENALIZACION_*` y `HORARIO_*`.',
+                responses: {200: ok('Terminos vigentes', ref('Terminos'))}
+            }
+        },
+        '/api/penalizaciones/mis': {
+            get: {
+                tags: ['Penalizaciones'], summary: 'Ver mis penalizaciones (estudiante)', operationId: 'misPenalizaciones', security: conToken,
+                description: '`totalAdeudado` suma las pendientes (bloquean nuevas solicitudes). `atrasoEnCurso` lista los prestamos entregados con la fecha vencida y lo que acumulan hasta ahora; se calcula al vuelo y se cobra al registrar la devolucion.',
+                parameters: [query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION})],
+                responses: {
+                    200: ok('Mis penalizaciones', {type: 'object', properties: {
+                        total: {type: 'integer'},
+                        totalAdeudado: {type: 'number', example: 9},
+                        totalAtrasoEnCurso: {type: 'number', example: 4.5},
+                        atrasoEnCurso: {type: 'array', items: {type: 'object', properties: {
+                            prestamo: ID_SCHEMA, recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}}},
+                            diasAtraso: {type: 'integer'}, montoAcumulado: {type: 'number'}
+                        }}},
+                        penalizaciones: {type: 'array', items: ref('Penalizacion')}
+                    }}),
+                    400: error('Filtro invalido', 'El estado debe ser: pendiente, pagada, anulada'), 401: r401, 403: r403
+                }
+            }
+        },
+        '/api/penalizaciones': {
+            get: {
+                tags: ['Penalizaciones'], summary: 'Listar penalizaciones (administrador)', operationId: 'listarPenalizaciones', security: conToken,
+                description: 'Con los datos del estudiante (nombres, apellidos, cedula, correo), del recurso y del prestamo (incluido el docente de referencia).',
+                parameters: [
+                    query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION}, 'pendiente'),
+                    query('usuario', 'Id del estudiante', ID_SCHEMA),
+                    query('desde', 'Fecha inicial (AAAA-MM-DD) de registro', {type: 'string', format: 'date'}, '2026-10-01'),
+                    query('hasta', 'Fecha final (AAAA-MM-DD), incluye todo ese dia', {type: 'string', format: 'date'}, '2026-10-31')
+                ],
+                responses: {
+                    200: ok('Penalizaciones', {type: 'object', properties: {total: {type: 'integer'}, totalPendiente: {type: 'number'}, penalizaciones: {type: 'array', items: ref('Penalizacion')}}}),
+                    400: error('Filtro invalido', 'El id del usuario no es valido'), 401: r401, 403: r403
+                }
+            }
+        },
+        '/api/penalizaciones/{id}/pagar': {
+            put: {
+                tags: ['Penalizaciones'], summary: 'Registrar el pago de una penalizacion (administrador)', operationId: 'pagarPenalizacion', security: conToken,
+                description: 'Solo sobre penalizaciones `pendiente`. Guarda `fechaPago` y notifica al estudiante.',
+                parameters: [idRuta('Id de la penalizacion')],
+                responses: {
+                    200: ok('Pago registrado', {type: 'object', properties: {msg: {type: 'string'}, penalizacion: ref('Penalizacion')}}),
+                    400: error('Id invalido o la penalizacion no esta pendiente', 'Solo se pueden modificar penalizaciones pendientes'),
+                    401: r401, 403: r403, 404: error('No existe', 'Penalizacion no encontrada')
+                }
+            }
+        },
+        '/api/penalizaciones/{id}/anular': {
+            put: {
+                tags: ['Penalizaciones'], summary: 'Anular una penalizacion (administrador)', operationId: 'anularPenalizacion', security: conToken,
+                description: 'Solo sobre penalizaciones `pendiente`, por ejemplo cuando el estudiante repone el articulo perdido. Notifica al estudiante.',
+                parameters: [idRuta('Id de la penalizacion')],
+                requestBody: {required: true, content: json({type: 'object', required: ['motivo'], properties: {motivo: {type: 'string', minLength: 3, maxLength: 200, example: 'El estudiante repuso el articulo'}}})},
+                responses: {
+                    200: ok('Penalizacion anulada', {type: 'object', properties: {msg: {type: 'string'}, penalizacion: ref('Penalizacion')}}),
+                    400: error('Sin motivo, id invalido o la penalizacion no esta pendiente', 'El motivo de la anulacion debe tener entre 3 y 200 caracteres'),
+                    401: r401, 403: r403, 404: error('No existe', 'Penalizacion no encontrada')
+                }
+            }
+        },
+
         // ---------------- Notificaciones ----------------
         '/api/notificaciones': {
             get: {
                 tags: ['Notificaciones (HU-010)'], summary: 'Consultar mis notificaciones', operationId: 'misNotificaciones', security: conToken,
-                description: 'Disponible para estudiantes y administradores. Al consultar, el sistema genera los avisos de devolucion: `recordatorio` cuando faltan 2 dias o menos y `vencido` cuando la fecha ya paso (una sola vez por prestamo). Si el SMTP esta configurado, las notificaciones tambien llegan al correo institucional.',
+                description: 'Disponible para estudiantes y administradores. Al consultar, el sistema genera los avisos de devolucion: `recordatorio` cuando faltan 2 dias o menos y `vencido` cuando la fecha ya paso (una sola vez por prestamo; recuerda que cada dia de atraso genera una penalizacion). El tipo `penalizacion` avisa de penalizaciones registradas, pagadas o anuladas. Si el SMTP esta configurado, las notificaciones tambien llegan al correo institucional.',
                 parameters: [query('leida', 'Filtra por leidas (true) o no leidas (false)', {type: 'string', enum: ['true', 'false']}, 'false')],
                 responses: {
                     200: ok('Notificaciones (maximo 100, las mas recientes primero)', {type: 'object', properties: {total: {type: 'integer'}, noLeidas: {type: 'integer'}, notificaciones: {type: 'array', items: ref('Notificacion')}}}),

@@ -44,6 +44,8 @@ Las variables del **backend** son secretas y solo se configuran en el servicio d
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | ✅ | — |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (correo de recuperación) | ✅ | — |
 | `INSTITUTIONAL_EMAIL_DOMAIN` | ✅ | — |
+| `PENALIZACION_ATRASO_DIA` (5), `PENALIZACION_DANIO` (20), `PENALIZACION_PERDIDA` (100): penalizaciones en % del precio del recurso | ✅ | — |
+| `HORARIO_INICIO` (07:00), `HORARIO_FIN` (18:00), `VALIDAR_HORARIO` (true): horario de entrega y devolución, hora de Ecuador | ✅ | — |
 | `VITE_API_URL` | — | ✅ |
 
 ## Despliegue en Render

@@ -38,6 +38,12 @@ const RecursoSchema = new Schema({
     imagenId:{
         type: String,
         default: null
+    },
+    // precio de reposicion en dolares: base para calcular las penalizaciones por atraso, dano o perdida
+    precio:{
+        type: Number,
+        min: 0,
+        default: 0
     }
 },{
     timestamps: true

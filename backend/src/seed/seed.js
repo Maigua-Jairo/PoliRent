@@ -1,6 +1,7 @@
 // Carga los recursos de ejemplo (src/seed/recursosSeed.js) en la base de datos de MONGODB_URI.
 // Uso: npm run seed            -> inserta los que faltan (compara por nombre, sin distinguir mayusculas)
 //      npm run seed -- --dry   -> solo muestra lo que insertaria
+// Cada recurso se inserta con su precio (preciosRecursos.js). Para poner precio a los recursos ya cargados: npm run precios
 import 'dotenv/config'
 import mongoose from 'mongoose'
 import conectarBaseDatos from '../config/database.js'
@@ -17,7 +18,7 @@ const sembrar = async () => {
 
     console.log(`Recursos en la base: ${existentes.length}. Nuevos por cargar: ${nuevos.length} (de ${RECURSOS_SEED.length}).`)
     if(simulacion){
-        nuevos.forEach(r => console.log(`  [${r.categoria}] ${r.nombre} -> ${r.etiquetas.join(', ')}`))
+        nuevos.forEach(r => console.log(`  [${r.categoria}] ${r.nombre} (precio ${r.precio}) -> ${r.etiquetas.join(', ')}`))
         console.log('Simulacion: no se inserto nada.')
     }else if(nuevos.length){
         await Recurso.insertMany(nuevos.map(r => ({...r, estado: 'disponible'})))

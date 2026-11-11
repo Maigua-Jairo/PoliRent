@@ -2,8 +2,10 @@
 // Mismo formato que los recursos ya cargados: 3 etiquetas en minuscula, singular y sin tildes,
 // tomadas del vocabulario de GRUPOS_RELACIONADOS (helpers/recomendacionHelper.js).
 // Se cargan con `npm run seed`; los que ya existen (mismo nombre) se omiten.
+// El precio de reposicion (base de las penalizaciones) sale de PRECIOS_RECURSOS por nombre exacto.
+import PRECIOS_RECURSOS from './preciosRecursos.js'
 
-const RECURSOS_SEED = [
+const RECURSOS_BASE = [
     // ---------- tecnico: electronica, robotica, redes, energia, taller y prototipado ----------
     {nombre: 'Kit de sensores Arduino', categoria: 'tecnico', descripcion: 'Set de 37 sensores compatibles con Arduino', etiquetas: ['sensor', 'arduino', 'robotica']},
     {nombre: 'Protoboard de 830 puntos', categoria: 'tecnico', descripcion: 'Protoboard con juego de cables jumper', etiquetas: ['protoboard', 'circuito', 'electronica']},
@@ -62,5 +64,7 @@ const RECURSOS_SEED = [
     {nombre: 'Amplificador con microfono', categoria: 'recreativo', descripcion: 'Amplificador portatil para eventos', etiquetas: ['amplificador', 'microfono', 'evento']},
     {nombre: 'Guitarra acustica', categoria: 'recreativo', descripcion: 'Guitarra para actividades culturales', etiquetas: ['guitarra', 'musica', 'cultura']}
 ]
+
+const RECURSOS_SEED = RECURSOS_BASE.map(r => ({...r, precio: PRECIOS_RECURSOS[r.nombre]}))
 
 export default RECURSOS_SEED

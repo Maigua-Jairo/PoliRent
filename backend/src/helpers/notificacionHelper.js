@@ -9,7 +9,8 @@ const ASUNTOS = {
     entregado: 'Recurso entregado',
     devuelto: 'Recurso devuelto',
     recordatorio: 'Recordatorio de devolucion',
-    vencido: 'Devolucion vencida'
+    vencido: 'Devolucion vencida',
+    penalizacion: 'Penalizacion registrada'
 }
 
 const formatearFecha = (fecha) => new Date(fecha).toLocaleDateString('es-EC', {timeZone: 'America/Guayaquil'})

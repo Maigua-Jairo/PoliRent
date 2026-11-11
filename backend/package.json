@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
-    "seed": "node src/seed/seed.js"
+    "seed": "node src/seed/seed.js",
+    "precios": "node src/seed/precios.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -1,7 +1,8 @@
 import Recurso from '../models/Recurso.js'
 import Prestamo, {ESTADOS_ACTIVOS} from '../models/Prestamo.js'
 import {recomendarRecursos} from '../helpers/recomendacionHelper.js'
-import {responderLocal, PREGUNTAS_FRECUENTES} from '../helpers/asistenteHelper.js'
+import {responderLocal, responderDeuda, esPreguntaDeuda, PREGUNTAS_FRECUENTES} from '../helpers/asistenteHelper.js'
+import {resumenPenalizaciones} from '../helpers/penalizacionHelper.js'
 import {consultarGemini} from '../helpers/geminiHelper.js'
 import {datosRecurso} from './recomendacionController.js'
 
@@ -37,7 +38,25 @@ const notaPrestamoActivo = (activo) => ` Recuerda que ya tienes ${activo.estado 
 const conversar = async (req, res) => {
     const mensaje = req.body.mensaje.trim()
     const historial = req.body.historial ?? []
+    const esEstudiante = req.usuarioHeader?.rol === 'estudiante'
     try {
+        // "¿cuanto debo?": se responde con los datos reales del estudiante, sin el motor local ni Gemini
+        if (esPreguntaDeuda(mensaje)) {
+            const [resumen, prestamoActivo] = await Promise.all([
+                esEstudiante ? resumenPenalizaciones(req.usuarioHeader._id) : null,
+                buscarPrestamoActivo(req.usuarioHeader)
+            ])
+            const deuda = responderDeuda(mensaje, resumen)
+            return res.status(200).json({
+                tipo: deuda.tipo,
+                respuesta: deuda.respuesta,
+                enlaces: deuda.enlaces,
+                recomendaciones: [],
+                prestamoActivo,
+                motor: 'local'
+            })
+        }
+
         const [disponibles, prestamoActivo] = await Promise.all([
             Recurso.find({estado: 'disponible'}).lean(),
             buscarPrestamoActivo(req.usuarioHeader)
@@ -49,10 +68,18 @@ const conversar = async (req, res) => {
 
         // 1) Gemini, si esta configurado y el motor local no esta seguro (las dudas claras se responden al instante)
         const candidatos = disponibles.length <= MAX_RECURSOS_GEMINI ? disponibles : puntuados.slice(0, CANDIDATOS_GEMINI).map(p => p.recurso)
-        const contextoUsuario = prestamoActivo
-            ? `Tiene ${prestamoActivo.estado === 'pendiente' ? 'una solicitud en revision' : 'un prestamo en curso'} de "${prestamoActivo.recurso.nombre}", asi que no puede reservar otro recurso hasta ${prestamoActivo.estado === 'pendiente' ? 'cancelarla o que la rechacen' : 'devolverlo'}.`
-            : ''
-        const gemini = local.seguro ? null : await consultarGemini({mensaje, historial, recursos: candidatos, contextoUsuario})
+        const usarGemini = !local.seguro && Boolean(process.env.GEMINI_API_KEY)
+        // la deuda solo se consulta si se va a preguntar a Gemini (el motor local no la necesita)
+        const resumen = usarGemini && esEstudiante ? await resumenPenalizaciones(req.usuarioHeader._id) : null
+        const contextoUsuario = [
+            prestamoActivo
+                ? `Tiene ${prestamoActivo.estado === 'pendiente' ? 'una solicitud en revision' : 'un prestamo en curso'} de "${prestamoActivo.recurso.nombre}", asi que no puede reservar otro recurso hasta ${prestamoActivo.estado === 'pendiente' ? 'cancelarla o que la rechacen' : 'devolverlo'}.`
+                : '',
+            resumen?.totalAdeudado > 0
+                ? `Tiene penalizaciones pendientes por $${resumen.totalAdeudado.toFixed(2)}, asi que no puede solicitar recursos hasta regularizarlas con la asociacion.`
+                : ''
+        ].filter(Boolean).join(' ')
+        const gemini = usarGemini ? await consultarGemini({mensaje, historial, recursos: candidatos, contextoUsuario}) : null
         if (gemini) {
             const porId = new Map(candidatos.map(r => [String(r._id), r]))
             const locales = new Map(puntuados.map(p => [String(p.recurso._id), p]))

@@ -1,6 +1,7 @@
 import Notificacion from '../models/Notificacion.js'
 import Prestamo from '../models/Prestamo.js'
 import {notificar, formatearFecha} from '../helpers/notificacionHelper.js'
+import {tarifas} from '../helpers/politicasHelper.js'
 
 const DIAS_AVISO = 2
 const MS_DIA = 24 * 60 * 60 * 1000
@@ -28,7 +29,8 @@ const generarAvisosDevolucion = async (usuarioId) => {
         const nombre = prestamo.recurso?.nombre ?? 'el recurso'
         const fecha = formatearFecha(prestamo.fechaDevolucion)
         const mensaje = tipo === 'vencido'
-            ? `El plazo de devolucion de "${nombre}" vencio el ${fecha}. Devuelvelo lo antes posible.`
+            ? `El plazo de devolucion de "${nombre}" vencio el ${fecha}. Devuelvelo lo antes posible. `
+                + `Cada dia de atraso genera una penalizacion del ${tarifas().atrasoPorDia} % del precio del recurso.`
             : `Recuerda devolver "${nombre}" el ${fecha} (${diasRestantes <= 0 ? 'es hoy' : `faltan ${diasRestantes} dia(s)`}).`
         await notificar(usuarioId, tipo, mensaje, prestamo._id)
     }

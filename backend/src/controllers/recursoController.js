@@ -12,7 +12,7 @@ const listaEtiquetas = (valor) => {
 
 //  registrar un recurso
 const crearRecurso = async (req, res) => {
-    const { nombre, descripcion, categoria, estado, imagen, etiquetas } = req.body
+    const { nombre, descripcion, categoria, estado, imagen, etiquetas, precio } = req.body
     try {
         const existe = await Recurso.findOne({ nombre: nombre.trim(), categoria })
         if (existe) {
@@ -32,7 +32,8 @@ const crearRecurso = async (req, res) => {
             etiquetas: listaEtiquetas(etiquetas),
             estado,
             imagen: imagenSubida ? imagenSubida.url : imagen?.trim(),
-            imagenId: imagenSubida?.publicId ?? null
+            imagenId: imagenSubida?.publicId ?? null,
+            precio: precio !== undefined ? Number(precio) : undefined
         })
         res.status(201).json({ msg: 'Recurso registrado correctamente', recurso })
     } catch (error) {
@@ -90,7 +91,7 @@ const detalleRecurso = async (req, res) => {
 
 // actualizar un recurso
 const actualizarRecurso = async (req, res) => {
-    const { nombre, descripcion, categoria, estado, imagen, etiquetas } = req.body
+    const { nombre, descripcion, categoria, estado, imagen, etiquetas, precio } = req.body
     try {
         const recurso = await Recurso.findById(req.params.id)
         if (!recurso) {
@@ -109,6 +110,7 @@ const actualizarRecurso = async (req, res) => {
         if (descripcion !== undefined) recurso.descripcion = descripcion.trim()
         if (estado !== undefined) recurso.estado = estado
         if (etiquetas !== undefined) recurso.etiquetas = listaEtiquetas(etiquetas)
+        if (precio !== undefined) recurso.precio = Number(precio)
         // una imagen subida reemplaza a la anterior; una URL en texto solo se usa si no hay archivo
         let imagenAnteriorId = null
         if (req.file) {

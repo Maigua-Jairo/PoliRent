@@ -4,9 +4,11 @@ import app from '../src/server.js'
 import Usuario from '../src/models/Usuario.js'
 import Recurso from '../src/models/Recurso.js'
 import Prestamo from '../src/models/Prestamo.js'
+import Penalizacion from '../src/models/Penalizacion.js'
+import {consulta} from './ayudantes.js'
 import {crearTokenJWT} from '../src/helpers/jwtHelper.js'
 import {recomendarRecursos} from '../src/helpers/recomendacionHelper.js'
-import {responderLocal} from '../src/helpers/asistenteHelper.js'
+import {responderLocal, responderDeuda} from '../src/helpers/asistenteHelper.js'
 import {validarRespuestaGemini} from '../src/helpers/geminiHelper.js'
 
 // Asistente (chat): ayuda sobre PoliRent + recomendacion de recursos. Sin base de datos ni internet:
@@ -169,5 +171,88 @@ describe('POST /api/asistente con Gemini', () => {
         expect(validarRespuestaGemini({tipo: 'ayuda', respuesta: '  '}, CATALOGO)).toBeNull()
         expect(validarRespuestaGemini({tipo: 'ayuda', respuesta: 'ok', recursos: [CATALOGO[0]._id], temas: ['registro', 'inventado']}, CATALOGO))
             .toEqual({tipo: 'ayuda', respuesta: 'ok', recursos: [], temas: ['registro']})
+    })
+})
+
+describe('Asistente: penalizaciones, horario y deuda', () => {
+    test.each([
+        ['que pasa si devuelvo tarde un recurso', 'penalizaciones'],
+        ['cuanto es la multa si lo pierdo', 'penalizaciones'],
+        ['y si se me daña el proyector', 'penalizaciones'],
+        ['hasta que hora puedo devolver', 'horario'],
+        ['en que horario se entregan los recursos', 'horario']
+    ])('"%s" es ayuda (%s)', (mensaje, id) => {
+        const r = local(mensaje)
+        expect(r.tipo).toBe('ayuda')
+        expect(r.preguntaFrecuente).toBe(id)
+    })
+
+    test('"buenas tardes" sigue siendo un saludo', () => {
+        expect(local('buenas tardes').respuesta).toMatch(/asistente de PoliRent/)
+    })
+
+    test('las respuestas usan las tarifas y el horario configurados', () => {
+        process.env.PENALIZACION_DANIO = '25'
+        process.env.HORARIO_FIN = '17:30'
+        try {
+            expect(local('que multa hay si lo devuelvo dañado').respuesta).toMatch(/25 % si lo devuelves dañado/)
+            expect(local('hasta que hora atienden').respuesta).toMatch(/y las 17:30/)
+        } finally {
+            delete process.env.PENALIZACION_DANIO
+            delete process.env.HORARIO_FIN
+        }
+    })
+
+    test('responderDeuda con deuda y atraso en curso', () => {
+        const r = responderDeuda('cuanto debo?', {totalAdeudado: 12.5, totalAtrasoEnCurso: 3})
+        expect(r).toMatchObject({tipo: 'ayuda', preguntaFrecuente: 'deuda', seguro: true, recomendaciones: []})
+        expect(r.respuesta).toMatch(/^Tienes \$12\.50 en penalizaciones pendientes; además, tu atraso actual acumula \$3\.00/)
+    })
+
+    test('responderDeuda sin deuda', () => {
+        expect(responderDeuda('tengo multas?', {totalAdeudado: 0, totalAtrasoEnCurso: 0}).respuesta).toBe('No tienes penalizaciones pendientes.')
+    })
+
+    test('responderDeuda sin sesion pide iniciar sesion', () => {
+        const r = responderDeuda('cual es mi saldo', null)
+        expect(r.respuesta).toMatch(/inicia sesión/)
+        expect(r.enlaces).toEqual([{texto: 'Iniciar sesión', ruta: '/login'}])
+    })
+
+    test('responderDeuda ignora mensajes que no preguntan por la deuda', () => {
+        expect(responderDeuda('como reservo un proyector', {totalAdeudado: 5, totalAtrasoEnCurso: 0})).toBeNull()
+    })
+
+    test('POST /api/asistente responde la deuda real del estudiante sin llamar a Gemini', async () => {
+        process.env.GEMINI_API_KEY = 'clave-de-prueba'
+        global.fetch = jest.fn()
+        jest.spyOn(Usuario, 'findById').mockReturnValue({select: () => Promise.resolve(ESTUDIANTE)})
+        simularActivo(null)
+        jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([{monto: 20}, {monto: 5}]))
+        jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([]))
+        const res = await preguntar({mensaje: '¿Cuánto debo?'}, crearTokenJWT(ESTUDIANTE._id, 'estudiante'))
+        expect(res.status).toBe(200)
+        expect(res.body).toMatchObject({tipo: 'ayuda', motor: 'local', recomendaciones: [], prestamoActivo: null})
+        expect(res.body.respuesta).toMatch(/Tienes \$25\.00 en penalizaciones pendientes/)
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    test('a un invitado que pregunta su deuda le pide iniciar sesion', async () => {
+        const res = await preguntar({mensaje: 'tengo penalizaciones?'})
+        expect(res.status).toBe(200)
+        expect(res.body.enlaces).toEqual([{texto: 'Iniciar sesión', ruta: '/login'}])
+    })
+
+    test('con Gemini, la deuda pendiente se agrega al contexto del usuario', async () => {
+        process.env.GEMINI_API_KEY = 'clave-de-prueba'
+        global.fetch = jest.fn().mockResolvedValue(respuestaGemini({tipo: 'recomendacion', respuesta: 'Te sirve el proyector.', recursos: [CATALOGO[0]._id]}))
+        jest.spyOn(Usuario, 'findById').mockReturnValue({select: () => Promise.resolve(ESTUDIANTE)})
+        simularActivo(null)
+        jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([{monto: 9}]))
+        jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([]))
+        const res = await preguntar({mensaje: 'tengo que exponer mi tesis'}, crearTokenJWT(ESTUDIANTE._id, 'estudiante'))
+        expect(res.body.motor).toBe('gemini')
+        const cuerpo = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(cuerpo.systemInstruction.parts[0].text).toContain('penalizaciones pendientes por $9.00')
     })
 })

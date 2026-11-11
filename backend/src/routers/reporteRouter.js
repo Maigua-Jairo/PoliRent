@@ -1,8 +1,8 @@
 import {Router} from 'express'
-import {metricas, reportePrestamos, reporteRecursos} from '../controllers/reporteController.js'
+import {metricas, reportePrestamos, reporteRecursos, reportePenalizaciones} from '../controllers/reporteController.js'
 import {verificarTokenJWT} from '../middlewares/authMiddleware.js'
 import {permitirRoles} from '../middlewares/roleMiddleware.js'
-import {validarFiltrosReporte} from '../middlewares/validationMiddleware.js'
+import {validarFiltrosReporte, validarFiltrosPenalizaciones} from '../middlewares/validationMiddleware.js'
 const router = Router()
 
 const soloAdministrador = [verificarTokenJWT, permitirRoles('administrador')]
@@ -11,5 +11,6 @@ const soloAdministrador = [verificarTokenJWT, permitirRoles('administrador')]
 router.get('/metricas', soloAdministrador, metricas)
 router.get('/reportes/prestamos', soloAdministrador, validarFiltrosReporte, reportePrestamos)
 router.get('/reportes/recursos', soloAdministrador, validarFiltrosReporte, reporteRecursos)
+router.get('/reportes/penalizaciones', soloAdministrador, validarFiltrosPenalizaciones, reportePenalizaciones)
 
 export default router

@@ -6,6 +6,8 @@
 // Si hay GEMINI_API_KEY, geminiHelper redacta la respuesta con esta misma base de conocimiento
 // y este motor queda como respaldo.
 
+import {tarifas, horario} from './politicasHelper.js'
+
 const TIPOS_RESPUESTA = ['ayuda', 'recomendacion', 'fuera_de_tema']
 
 const RESPUESTA_FUERA_DE_TEMA = 'Solo puedo ayudarte con el uso de PoliRent y a encontrar recursos para tus proyectos o actividades. '
@@ -93,7 +95,8 @@ const PREGUNTAS_FRECUENTES = [
         // verbos muy generales: en un empate gana la pregunta mas especifica (p. ej. "cancelo mi solicitud")
         peso: 0.9,
         respuesta: 'Inicia sesión con tu cuenta de estudiante, busca el recurso en la sección Recursos y abre su ficha. '
-            + 'Si está disponible, elige la fecha de devolución (máximo 30 días), escribe opcionalmente el motivo y envía la solicitud. '
+            + 'Si está disponible, elige la fecha de devolución (máximo 30 días), escribe opcionalmente el motivo, indica un docente de referencia '
+            + '(nombre y correo), acepta los términos y condiciones y envía la solicitud. '
             + 'Quedará "En revisión" hasta que la asociación la apruebe o la rechace.',
         enlaces: [{texto: 'Ver recursos', ruta: '/#recursos'}]
     },
@@ -110,7 +113,8 @@ const PREGUNTAS_FRECUENTES = [
         titulo: '¿Puedo pedir varios recursos a la vez?',
         claves: ['otro recurs', 'mas de un', 'varios', 'dos recurs', 'a la vez', 'al mismo tiempo', 'no pued solicit', 'no pued reserv', 'no me dej'],
         respuesta: 'Solo puedes tener un préstamo a la vez. Mientras tengas una solicitud en revisión, aprobada o un recurso en préstamo, '
-            + 'no puedes solicitar otro: cancela la solicitud o devuelve el recurso y luego podrás reservar uno nuevo.',
+            + 'no puedes solicitar otro: cancela la solicitud o devuelve el recurso y luego podrás reservar uno nuevo. '
+            + 'Tampoco puedes solicitar recursos mientras tengas penalizaciones pendientes.',
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
@@ -132,10 +136,38 @@ const PREGUNTAS_FRECUENTES = [
     {
         id: 'retiro_devolucion',
         titulo: '¿Dónde retiro y devuelvo los recursos?',
-        claves: ['retir', 'recog', 'devolv', 'devuelv', 'devoluc', 'entreg', 'horario', 'ubicac', 'carn'],
-        respuesta: 'Con la solicitud aprobada acércate al punto de retiro de la asociación dentro del horario de atención y presenta tu carné estudiantil; '
-            + 'el detalle de tu solicitud indica el lugar y el horario. La devolución se hace en el mismo punto, con el recurso limpio y completo. '
-            + 'El responsable registra la entrega y la devolución en el sistema.',
+        claves: ['retir', 'recog', 'devolv', 'devuelv', 'devoluc', 'entreg', 'ubicac', 'carn'],
+        get respuesta() {
+            const {inicio, fin} = horario()
+            return `Con la solicitud aprobada acércate al punto de retiro de la asociación entre las ${inicio} y las ${fin} (hora de Ecuador) y presenta tu carné estudiantil; `
+                + 'el detalle de tu solicitud indica el lugar. La devolución se hace en el mismo punto y horario, con el recurso limpio y completo. '
+                + 'El responsable registra la entrega y la devolución en el sistema, con una foto de evidencia si hace falta.'
+        },
+        enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    },
+    {
+        id: 'horario',
+        titulo: '¿En qué horario se entregan y devuelven los recursos?',
+        claves: ['horario', 'que hora', 'hasta que hora', 'desde que hora', 'a partir de que hora', '7 am', '6 pm', 'entreg', 'devoluc'],
+        get respuesta() {
+            const {inicio, fin} = horario()
+            return `La entrega y la devolución de los recursos solo se realizan entre las ${inicio} y las ${fin} (hora de Ecuador). `
+                + `Por eso la fecha de devolución que eliges al reservar se fija a las ${fin} de ese día. `
+                + 'Fuera de ese horario el responsable no puede registrar la entrega ni la devolución.'
+        },
+        enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    },
+    {
+        id: 'penalizaciones',
+        titulo: '¿Qué pasa si devuelvo tarde, dañado o pierdo un recurso?',
+        claves: ['penaliz', 'multa', 'sancion', 'dano', 'dana', 'danad', 'dane', 'devuelv tard', 'devolv tard', 'entreg tard', 'rompi', 'perdi', 'pierd', 'atras', 'retras', 'cuanto cuest perd', 'termin condicion'],
+        get respuesta() {
+            const t = tarifas()
+            return `Las penalizaciones son un porcentaje del precio del recurso: ${t.atrasoPorDia} % por cada día o fracción de atraso, `
+                + `${t.danio} % si lo devuelves dañado o incompleto y ${t.perdida} % si lo pierdes (o puedes reponerlo completo y la asociación anula la penalización). `
+                + `Se acumulan hasta un máximo del ${t.tope} % del precio por préstamo. Mientras tengas penalizaciones pendientes no podrás solicitar otro recurso; `
+                + 'las aceptas en los términos y condiciones al reservar.'
+        },
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
@@ -260,4 +292,36 @@ const responderLocal = (mensaje, recomendaciones = []) => {
     return fueraDeTema()
 }
 
-export {TIPOS_RESPUESTA, PREGUNTAS_FRECUENTES, RESPUESTA_FUERA_DE_TEMA, buscarPreguntaFrecuente, responderLocal}
+// el usuario pregunta cuanto debe en penalizaciones
+const SENALES_DEUDA = ['cuanto debo', 'cuanto adeudo', 'deuda', 'debo algo', 'tengo penaliz', 'tengo multa', 'tengo sancion',
+    'mis penaliz', 'mis multa', 'cuanto tengo que pag', 'cuanto me toca pag', 'saldo', 'debo dinero', 'debo plata']
+
+const esPreguntaDeuda = (mensaje) => tieneSenal(SENALES_DEUDA, mensaje)
+const dolares = (monto) => `$${(Number(monto) || 0).toFixed(2)}`
+
+/**
+ * Respuesta a "¿cuánto debo?".
+ * @param {string} mensaje
+ * @param {{totalAdeudado, totalAtrasoEnCurso} | null} resumen  null si no hay sesion de estudiante
+ * @returns {{tipo, respuesta, enlaces, recomendaciones, preguntaFrecuente, seguro} | null}  null si el mensaje no pregunta por la deuda
+ */
+const responderDeuda = (mensaje, resumen) => {
+    if (!esPreguntaDeuda(mensaje)) return null
+    const respuesta = (texto, enlaces) => ({tipo: 'ayuda', respuesta: texto, enlaces, recomendaciones: [], preguntaFrecuente: 'deuda', seguro: true})
+    if (!resumen) {
+        return respuesta('Para consultar tus penalizaciones inicia sesión con tu cuenta de estudiante. '
+            + 'Las penalizaciones se generan por atraso, daño o pérdida de un recurso.', [{texto: 'Iniciar sesión', ruta: '/login'}])
+    }
+    const deuda = Number(resumen.totalAdeudado) || 0
+    const atraso = Number(resumen.totalAtrasoEnCurso) || 0
+    const enlaces = [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    if (deuda > 0) {
+        return respuesta(`Tienes ${dolares(deuda)} en penalizaciones pendientes`
+            + (atraso > 0 ? `; además, tu atraso actual acumula ${dolares(atraso)}` : '')
+            + '. Regularízalas con la asociación: mientras tengas penalizaciones pendientes no podrás solicitar otro recurso.', enlaces)
+    }
+    return respuesta('No tienes penalizaciones pendientes'
+        + (atraso > 0 ? `, pero tu atraso actual acumula ${dolares(atraso)}: devuelve el recurso cuanto antes para que no siga aumentando.` : '.'), enlaces)
+}
+
+export {TIPOS_RESPUESTA, PREGUNTAS_FRECUENTES, RESPUESTA_FUERA_DE_TEMA, buscarPreguntaFrecuente, responderLocal, esPreguntaDeuda, responderDeuda}
