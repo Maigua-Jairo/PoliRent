@@ -34,6 +34,62 @@
   scrollbar-color: rgb(255 255 255 / 0.2) transparent;
 }
 
+@keyframes progreso-scroll {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.scroll-progreso {
+  transform-origin: left;
+}
+
+.scroll-tabla {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.scroll-tabla::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0;
+}
+
+.scroll-tabla::-webkit-scrollbar-track {
+  border-radius: 9999px;
+  background: #f8fafc;
+}
+
+.scroll-tabla::-webkit-scrollbar-thumb {
+  border: 2px solid #f8fafc;
+  border-radius: 9999px;
+  background: #cbd5e1;
+}
+
+.dark .scroll-tabla {
+  scrollbar-color: #475569 #1e293b;
+}
+
+.dark .scroll-tabla::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark .scroll-tabla::-webkit-scrollbar-thumb {
+  border-color: #1e293b;
+  background: #475569;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .scroll-progreso {
+      animation: progreso-scroll linear both;
+      animation-timeline: scroll(nearest block);
+    }
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

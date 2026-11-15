@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './config/environment.js'
 import app from './server.js'
 import conectarBaseDatos from './config/database.js'
 import {configurarCloudinary, cloudinaryConfigurado} from './config/cloudinary.js'

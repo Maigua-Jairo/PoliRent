@@ -8,7 +8,7 @@ import { formatearFechaHora } from '../../utils/prestamos.js'
 import { codigoSolicitud } from '../../utils/reporte.js'
 
 const accion =
-  'grid h-8 w-8 place-items-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-40'
+  'grid h-9 w-9 place-items-center rounded-lg text-brand-600/70 transition-colors hover:bg-brand-500/10 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-400/70 dark:hover:text-brand-400'
 
 /* ---------- Últimas solicitudes con acciones de aprobar / rechazar (HU-003) ---------- */
 export default function SolicitudesRecientes({ prestamos, cargando, procesando, onAprobar, onRechazar, limite = 6 }) {
@@ -32,11 +32,11 @@ export default function SolicitudesRecientes({ prestamos, cargando, procesando, 
           <thead className="bg-slate-50 text-xs font-bold text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
             <tr>
               {['ID', 'Usuario', 'Recurso', 'Tipo', 'Fecha solicitud', 'Estado'].map((columna) => (
-                <th key={columna} scope="col" className={`px-3 py-3 whitespace-nowrap ${['ID', 'Tipo'].includes(columna) ? 'hidden 2xl:table-cell' : ''}`}>
+                <th key={columna} scope="col" className={`px-3 py-3 whitespace-nowrap ${['Tipo', 'Estado'].includes(columna) ? 'text-center' : ''} ${['ID', 'Tipo'].includes(columna) ? 'hidden 2xl:table-cell' : ''}`}>
                   {columna}
                 </th>
               ))}
-              <th scope="col" className="px-3 py-3 text-right">
+              <th scope="col" className="px-3 py-3 text-center">
                 Acciones
               </th>
             </tr>
@@ -53,13 +53,13 @@ export default function SolicitudesRecientes({ prestamos, cargando, procesando, 
                   <td className="max-w-44 truncate px-3 py-3" title={recurso}>
                     {recurso}
                   </td>
-                  <td className="hidden px-3 py-3 2xl:table-cell">{p.recurso ? buscarCategoria(p.recurso.categoria).etiqueta : '—'}</td>
+                  <td className="hidden px-3 py-3 text-center 2xl:table-cell">{p.recurso ? buscarCategoria(p.recurso.categoria).etiqueta : '—'}</td>
                   <td className="px-3 py-3 whitespace-nowrap">{formatearFechaHora(p.createdAt)}</td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 text-center">
                     <EtiquetaPrestamo estado={p.estado} />
                   </td>
                   <td className="px-3 py-3">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex justify-center gap-1">
                       {pendiente && (
                         <>
                           <button
@@ -68,9 +68,9 @@ export default function SolicitudesRecientes({ prestamos, cargando, procesando, 
                             disabled={procesando}
                             aria-label={`Aprobar solicitud de ${usuario} para ${recurso}`}
                             title="Aprobar"
-                            className={`${accion} text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10`}
+                            className={accion}
                           >
-                            <Icon size={18} stroke={2.4}>{iconos.check}</Icon>
+                            <Icon size={18}>{iconos.check}</Icon>
                           </button>
                           <button
                             type="button"
@@ -78,9 +78,9 @@ export default function SolicitudesRecientes({ prestamos, cargando, procesando, 
                             disabled={procesando}
                             aria-label={`Rechazar solicitud de ${usuario} para ${recurso}`}
                             title="Rechazar"
-                            className={`${accion} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10`}
+                            className={accion}
                           >
-                            <Icon size={18} stroke={2.4}>{iconos.cerrar}</Icon>
+                            <Icon size={18}>{iconos.cerrar}</Icon>
                           </button>
                         </>
                       )}
@@ -89,7 +89,7 @@ export default function SolicitudesRecientes({ prestamos, cargando, procesando, 
                           to={`/recursos/${p.recurso._id}`}
                           aria-label={`Ver ${recurso}`}
                           title="Ver recurso"
-                          className={`${accion} text-brand-600 hover:bg-brand-500/10 dark:text-brand-400`}
+                          className={accion}
                         >
                           <Icon size={18}>{iconos.ojo}</Icon>
                         </Link>

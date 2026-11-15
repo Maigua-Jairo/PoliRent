@@ -11,6 +11,34 @@ export const ESTADOS_PRESTAMO = [
 
 export const buscarEstadoPrestamo = (valor) => ESTADOS_PRESTAMO.find((e) => e.valor === valor) ?? ESTADOS_PRESTAMO[0]
 
+const normalizarTexto = (valor) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es')
+
+export const filtrarPrestamosAdmin = (prestamos, { busqueda = '', estado = '', estadosIncluidos } = {}) => {
+  const consulta = normalizarTexto(busqueda.trim())
+
+  return prestamos.filter((prestamo) => {
+    if (estadosIncluidos && !estadosIncluidos.includes(prestamo.estado)) return false
+    if (estado && prestamo.estado !== estado) return false
+    if (!consulta) return true
+
+    const texto = [
+      prestamo.usuario?.nombres,
+      prestamo.usuario?.apellidos,
+      prestamo.usuario?.correo,
+      prestamo.recurso?.nombre,
+      prestamo.recurso?.categoria,
+      buscarEstadoPrestamo(prestamo.estado).etiqueta,
+      prestamo.estado,
+    ].map(normalizarTexto).join(' ')
+
+    return texto.includes(consulta)
+  })
+}
+
 export const ESTADOS_ACTIVOS = ['pendiente', 'aprobado', 'entregado']
 // Mismas reglas que cancelarPrestamo en backend/src/controllers/prestamoController.js
 export const ESTADOS_CANCELABLES = ['pendiente', 'aprobado']

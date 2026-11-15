@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import Icon from '../Icon.jsx'
 import { iconos } from '../layout/iconos.jsx'
 import { obtenerMensajeError } from '../../services/authService.js'
-import { obtenerRecomendaciones } from '../../services/recomendacionService.js'
+import { conversarConAsistente } from '../../services/asistenteService.js'
 import { useAuthStore } from '../../store/authStore.js'
 import { useConsultasStore } from '../../store/consultasStore.js'
-import { CONTEXTO_MAX, LIMITE_RECOMENDACIONES, validarContexto } from '../../utils/recomendaciones.js'
+import { CONTEXTO_MAX } from '../../utils/recomendaciones.js'
 
 export default function AsistenteFlotante() {
+  const { pathname } = useLocation()
   const usuario = useAuthStore((state) => state.usuario)
   const agregarConsulta = useConsultasStore((state) => state.agregarConsulta)
   const [abierto, setAbierto] = useState(false)
@@ -24,30 +25,24 @@ export default function AsistenteFlotante() {
 
     setMensajes((actuales) => [...actuales, { autor: 'usuario', texto: pregunta }])
     setTexto('')
-
-    const errorValidacion = validarContexto(pregunta)
-    if (errorValidacion) {
-      setMensajes((actuales) => [
-        ...actuales,
-        { autor: 'asistente', texto: errorValidacion },
-      ])
+    if (pregunta.length < 2) {
+      setMensajes((actuales) => [...actuales, { autor: 'asistente', texto: 'Escribe al menos 2 caracteres.' }])
       return
     }
 
     setEnviando(true)
     try {
-      const { recomendaciones = [] } = await obtenerRecomendaciones({
-        contexto: pregunta,
-        limite: LIMITE_RECOMENDACIONES,
+      const { respuesta, recomendaciones = [], enlaces = [] } = await conversarConAsistente({
+        mensaje: pregunta,
+        historial: mensajes.slice(-10).map(({ autor, texto }) => ({ rol: autor, texto })),
       })
       setMensajes((actuales) => [
         ...actuales,
         {
           autor: 'asistente',
-          texto: recomendaciones.length
-            ? 'Encontré recursos relacionados con tu consulta:'
-            : 'No encontré recursos disponibles relacionados con tu consulta. Prueba describiendo tu proyecto o necesidad con otros términos.',
+          texto: respuesta,
           recomendaciones,
+          enlaces,
         },
       ])
       agregarConsulta(claveUsuario, pregunta)
@@ -58,6 +53,8 @@ export default function AsistenteFlotante() {
       entrada.current?.focus()
     }
   }
+
+  if (pathname === '/recomendaciones') return null
 
   return (
     <div className="fixed right-4 bottom-4 z-[60] flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
@@ -144,9 +141,24 @@ export default function AsistenteFlotante() {
                     </li>
                   </ul>
                 )}
+                {mensaje.enlaces?.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {mensaje.enlaces.map((enlace) => (
+                      <li key={`${enlace.ruta}-${enlace.texto}`}>
+                        <Link
+                          to={enlace.ruta}
+                          onClick={() => setAbierto(false)}
+                          className="inline-block rounded-full border border-brand-200 px-2.5 py-1 text-xs font-semibold text-brand-700 underline-offset-2 hover:bg-brand-50 hover:underline dark:border-brand-500/30 dark:text-brand-300 dark:hover:bg-brand-500/10"
+                        >
+                          {enlace.texto}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
-            {enviando && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">Buscando recursos…</p>}
+            {enviando && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">Consultando al asistente…</p>}
           </div>
 
           <form

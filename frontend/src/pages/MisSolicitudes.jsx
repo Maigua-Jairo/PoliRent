@@ -2,21 +2,26 @@ import { useCallback, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import Alerta from '../components/Alerta.jsx'
 import Icon from '../components/Icon.jsx'
+import FiltrosTablaAdmin from '../components/admin/FiltrosTablaAdmin.jsx'
 import ImagenRecurso from '../components/recursos/ImagenRecurso.jsx'
 import EtiquetaPrestamo from '../components/prestamos/EtiquetaPrestamo.jsx'
 import DialogoCancelarPrestamo from '../components/prestamos/DialogoCancelarPrestamo.jsx'
 import { Esqueleto, tarjeta } from '../components/dashboard/comunes.jsx'
 import { iconos } from '../components/layout/iconos.jsx'
-import { pestana } from '../components/auth/authStyles.jsx'
 import useMisPrestamos from '../hooks/useMisPrestamos.js'
-import { filtrarPorPestana, formatearFecha, PESTANAS_SOLICITUDES, puedeCancelar } from '../utils/prestamos.js'
+import {
+  filtrarPrestamosAdmin,
+  formatearFecha,
+  PESTANAS_SOLICITUDES,
+  puedeCancelar,
+} from '../utils/prestamos.js'
 
-const btnAccion =
-  'inline-flex items-center justify-center rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500'
-const btnVer = `${btnAccion} border-brand-500/40 text-brand-600 hover:bg-brand-500/10 dark:text-brand-400`
-const btnCancelar = `${btnAccion} border-red-300 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10`
+const btnIcono =
+  'grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-400'
+const btnCancelar =
+  'hover:bg-red-50 hover:text-red-600 focus-visible:outline-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400'
 
-const columnas = 'lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem] lg:items-center lg:gap-4'
+const columnas = 'lg:grid lg:grid-cols-[6rem_minmax(0,1fr)_9rem_8rem_10rem] lg:items-center lg:gap-4'
 
 /* ---------- Solicitudes del estudiante con su estado (HU-007) ---------- */
 export default function MisSolicitudes() {
@@ -24,11 +29,13 @@ export default function MisSolicitudes() {
   const [params, setParams] = useSearchParams()
   const { cargando, error, prestamos, recargar } = useMisPrestamos()
   const [aCancelar, setACancelar] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
   // el mensaje llega al crear una solicitud desde el detalle del recurso
   const [aviso, setAviso] = useState({ tipo: 'exito', texto: location.state?.mensaje ?? '' })
 
   const activa = PESTANAS_SOLICITUDES.some((p) => p.valor === params.get('estado')) ? params.get('estado') : 'todas'
-  const visibles = filtrarPorPestana(prestamos, activa)
+  const estadosIncluidos = PESTANAS_SOLICITUDES.find((p) => p.valor === activa)?.estados
+  const visibles = filtrarPrestamosAdmin(prestamos, { busqueda, estadosIncluidos: estadosIncluidos ?? undefined })
   const cerrarDialogo = useCallback(() => setACancelar(null), [])
 
   const onResultado = ({ tipo, texto }) => {
@@ -37,66 +44,7 @@ export default function MisSolicitudes() {
   }
 
   const elegir = (valor) => setParams(valor === 'todas' ? {} : { estado: valor }, { replace: true })
-
-  let contenido
-  if (cargando) {
-    contenido = (
-      <div className="space-y-3 p-4" role="status" aria-label="Cargando solicitudes">
-        {[0, 1, 2, 3].map((i) => (
-          <Esqueleto key={i} className="h-16" />
-        ))}
-      </div>
-    )
-  } else if (!visibles.length) {
-    contenido = (
-      <div className="px-6 py-14 text-center">
-        <p className="font-script text-3xl font-bold text-epn-900 dark:text-white">
-          {prestamos.length ? 'Nada por aquí…' : 'Aún no tienes solicitudes'}
-        </p>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          {prestamos.length ? 'No hay solicitudes con este estado.' : 'Explora el catálogo y solicita tu primer recurso.'}
-        </p>
-        {!prestamos.length && (
-          <Link to="/#recursos" className="mt-4 inline-block text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
-            Ir al catálogo
-          </Link>
-        )}
-      </div>
-    )
-  } else {
-    contenido = (
-      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-        {visibles.map((p) => {
-          const recurso = p.recurso ?? { nombre: 'Recurso eliminado' }
-          return (
-            <li key={p._id} className={`flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 sm:px-6 ${columnas}`}>
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <ImagenRecurso recurso={recurso} tamanoIcono={18} className="h-12 w-12 shrink-0 rounded-lg" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-epn-900 dark:text-white">{recurso.nombre}</span>
-                  <span className="block text-xs text-slate-500 lg:hidden dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
-                </span>
-              </div>
-              <span className="hidden whitespace-nowrap text-sm text-slate-500 lg:block dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
-              <span>
-                <EtiquetaPrestamo estado={p.estado} />
-              </span>
-              <div className="flex gap-2 md:justify-end">
-                <Link to={`/solicitudes/${p._id}`} className={btnVer} aria-label={`Ver solicitud de ${recurso.nombre}`}>
-                  Ver
-                </Link>
-                {puedeCancelar(p) && (
-                  <button type="button" onClick={() => setACancelar(p)} className={btnCancelar} aria-label={`Cancelar solicitud de ${recurso.nombre}`}>
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-    )
-  }
+  const cambiarEstado = (valor) => elegir(valor || 'todas')
 
   return (
     <div className="space-y-6 motion-safe:animate-aparecer">
@@ -108,25 +56,105 @@ export default function MisSolicitudes() {
       <Alerta tipo={aviso.tipo}>{aviso.texto}</Alerta>
       <Alerta>{error}</Alerta>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filtrar por estado">
-        {PESTANAS_SOLICITUDES.map((p) => (
-          <button key={p.valor} type="button" aria-pressed={activa === p.valor} onClick={() => elegir(p.valor)} className={pestana(activa === p.valor)}>
-            {p.etiqueta} <span className="opacity-70">({filtrarPorPestana(prestamos, p.valor).length})</span>
-          </button>
-        ))}
-      </div>
+      <FiltrosTablaAdmin
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        estado={activa === 'todas' ? '' : activa}
+        onEstado={cambiarEstado}
+        estados={PESTANAS_SOLICITUDES.filter((p) => p.valor !== 'todas')}
+        etiquetaBusqueda="Buscar recurso..."
+      />
 
       <section aria-label="Solicitudes" className={`${tarjeta} overflow-hidden`}>
         <div
-          className={`hidden border-b border-slate-200 bg-slate-50 px-6 py-3 text-xs font-bold tracking-wide text-slate-600 uppercase lg:grid dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 ${columnas}`}
-          aria-hidden="true"
+          className="scroll-tabla max-h-[70vh] overflow-y-auto overflow-x-hidden"
+          role="region"
+          aria-label="Lista de solicitudes"
+          tabIndex={0}
         >
-          <span>Recurso</span>
-          <span>Fecha solicitud</span>
-          <span>Estado</span>
-          <span className="text-right">Acciones</span>
+          <div className="scroll-progreso sticky top-0 z-20 -mb-[3px] h-[3px] bg-brand-500" aria-hidden="true" />
+          <div
+            className={`sticky top-[3px] z-10 hidden border-b border-slate-200 bg-slate-50 px-6 py-3 text-xs font-bold tracking-wide text-slate-600 uppercase lg:grid dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 ${columnas}`}
+            aria-hidden="true"
+          >
+            <span>ID</span>
+            <span>Recurso</span>
+            <span>Fecha solicitud</span>
+            <span className="text-center">Estado</span>
+            <span className="text-center">Acciones</span>
+          </div>
+
+          {cargando ? (
+            <div className="space-y-3 p-4" role="status" aria-label="Cargando solicitudes">
+              {[0, 1, 2, 3].map((i) => <Esqueleto key={i} className="h-16" />)}
+            </div>
+          ) : !visibles.length ? (
+            <div className="px-6 py-14 text-center">
+              <p className="font-script text-3xl font-bold text-epn-900 dark:text-white">
+                {prestamos.length ? 'Nada por aquí…' : 'Aún no tienes solicitudes'}
+              </p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {prestamos.length
+                  ? 'No hay solicitudes que coincidan con los filtros.'
+                  : 'Explora el catálogo y solicita tu primer recurso.'}
+              </p>
+              {!prestamos.length && (
+                <Link to="/#recursos" className="mt-4 inline-block text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                  Ir al catálogo
+                </Link>
+              )}
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {visibles.map((p, i) => {
+                const recurso = p.recurso ?? { nombre: 'Recurso eliminado' }
+                return (
+                  <li
+                    key={p._id}
+                    className={`flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 motion-safe:animate-aparecer sm:px-6 ${columnas}`}
+                    style={{ animationDelay: `${Math.min(i, 11) * 35}ms` }}
+                  >
+                    <span className="w-20 shrink-0 font-mono text-xs text-slate-500 sm:w-24 lg:w-auto dark:text-slate-400">
+                      {i + 1}
+                    </span>
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <ImagenRecurso recurso={recurso} tamanoIcono={18} className="h-12 w-12 shrink-0 rounded-lg" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-epn-900 dark:text-white">{recurso.nombre}</span>
+                        <span className="block text-xs text-slate-500 lg:hidden dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
+                      </span>
+                    </div>
+                    <span className="hidden whitespace-nowrap text-sm text-slate-500 lg:block dark:text-slate-400">{formatearFecha(p.createdAt)}</span>
+                    <span className="flex justify-center">
+                      <EtiquetaPrestamo estado={p.estado} />
+                    </span>
+                    <div className="ml-auto flex gap-1 lg:ml-0 lg:justify-center">
+                      <Link
+                        to={`/solicitudes/${p._id}`}
+                        className={btnIcono}
+                        aria-label={`Ver solicitud de ${recurso.nombre}`}
+                        title="Ver solicitud"
+                      >
+                        <Icon size={18}>{iconos.ojo}</Icon>
+                      </Link>
+                      {puedeCancelar(p) && (
+                        <button
+                          type="button"
+                          onClick={() => setACancelar(p)}
+                          className={`${btnIcono} ${btnCancelar}`}
+                          aria-label={`Cancelar solicitud de ${recurso.nombre}`}
+                          title="Cancelar solicitud"
+                        >
+                          <Icon size={18}>{iconos.cerrar}</Icon>
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
-        {contenido}
       </section>
 
       {!cargando && prestamos.length > 0 && (

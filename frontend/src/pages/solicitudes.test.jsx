@@ -57,10 +57,41 @@ describe('Mis solicitudes (HU-007)', () => {
     const lista = within(await screen.findByRole('region', { name: 'Solicitudes' }))
     expect(await lista.findByText('Laptop Dell Inspiron 15')).toBeInTheDocument()
     expect(lista.getByText('Tablet gráfica Wacom')).toBeInTheDocument()
+    expect(lista.getByText('1')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /Rechazadas \(1\)/ }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por estado' }), 'rechazadas')
     expect(lista.queryByText('Laptop Dell Inspiron 15')).not.toBeInTheDocument()
     expect(lista.getByText('Tablet gráfica Wacom')).toBeInTheDocument()
+  })
+
+  test('busca recursos y presenta las acciones con el estilo de Herramientas', async () => {
+    const user = userEvent.setup()
+    renderEn('/solicitudes')
+
+    const tabla = await screen.findByRole('region', { name: 'Lista de solicitudes' })
+    expect(tabla).toHaveClass('max-h-[70vh]', 'overflow-y-auto', 'overflow-x-hidden', 'scroll-tabla')
+    expect(tabla).toHaveAttribute('tabindex', '0')
+    expect(within(tabla).getByText('Acciones')).toHaveClass('text-center')
+    expect(within(tabla).getByText('Estado')).toHaveClass('text-center')
+
+    const busqueda = screen.getByRole('searchbox', { name: 'Buscar recurso...' })
+    await user.type(busqueda, 'kit')
+
+    expect(within(tabla).getByText('Kit de herramientas básicas')).toBeInTheDocument()
+    expect(within(tabla).queryByText('Laptop Dell Inspiron 15')).not.toBeInTheDocument()
+
+    await user.clear(busqueda)
+    const enlaceVer = within(tabla).getByRole('link', { name: 'Ver solicitud de Laptop Dell Inspiron 15' })
+    const botonCancelar = within(tabla).getByRole('button', { name: 'Cancelar solicitud de Laptop Dell Inspiron 15' })
+    expect(enlaceVer.parentElement).toHaveClass('lg:justify-center')
+    expect(within(tabla).getByText('Aprobada').parentElement).toHaveClass('flex', 'justify-center')
+    expect(botonCancelar.querySelector('svg path')).toHaveAttribute('d', 'M18 6 6 18M6 6l12 12')
+    for (const accion of [enlaceVer, botonCancelar]) {
+      expect(accion).toHaveClass('h-9', 'w-9')
+      expect(accion.querySelector('svg')).toHaveAttribute('stroke-width', '2')
+    }
+    expect(enlaceVer).toHaveAttribute('title', 'Ver solicitud')
+    expect(botonCancelar).toHaveAttribute('title', 'Cancelar solicitud')
   })
 
   test('mantiene alineada la fecha aunque el recurso tenga un nombre largo', async () => {
@@ -89,8 +120,8 @@ describe('Mis solicitudes (HU-007)', () => {
       .find((elemento) => elemento.classList.contains('whitespace-nowrap'))
 
     expect(columnaFecha).toBeInTheDocument()
-    expect(filaDomino.className).toContain('lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem]')
-    expect(filaCorta.className).toContain('lg:grid-cols-[minmax(0,1fr)_9rem_8rem_10rem]')
+    expect(filaDomino.className).toContain('lg:grid-cols-[6rem_minmax(0,1fr)_9rem_8rem_10rem]')
+    expect(filaCorta.className).toContain('lg:grid-cols-[6rem_minmax(0,1fr)_9rem_8rem_10rem]')
   })
 
   test('solo permite cancelar solicitudes en revisión o aprobadas', async () => {

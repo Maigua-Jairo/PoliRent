@@ -16,6 +16,11 @@ vi.mock('../../services/prestamoService.js', () => ({
   rechazarPrestamo: vi.fn(),
 }))
 vi.mock('../../services/recursoService.js', () => ({ listarRecursos: vi.fn() }))
+vi.mock('../../services/notificacionService.js', () => ({
+  listarNotificaciones: vi.fn().mockResolvedValue({ notificaciones: [] }),
+  marcarNotificacionLeida: vi.fn(),
+  marcarTodasNotificacionesLeidas: vi.fn(),
+}))
 
 const admin = { id: '9', nombres: 'Ana', apellidos: 'Torres', rol: 'administrador' }
 
@@ -68,6 +73,17 @@ describe('Dashboard del administrador (HU-003)', () => {
     const solicitudes = within(screen.getByRole('region', { name: 'Solicitudes recientes' }))
     expect(await solicitudes.findByText('Multímetro digital')).toBeInTheDocument()
     expect(solicitudes.getByText('#SR-00A1')).toBeInTheDocument()
+    expect(solicitudes.getByRole('columnheader', { name: 'Estado' })).toHaveClass('text-center')
+    expect(solicitudes.getByRole('columnheader', { name: 'Acciones' })).toHaveClass('text-center')
+    expect(solicitudes.getByRole('columnheader', { name: 'Tipo' })).toHaveClass('text-center')
+    for (const accion of [
+      solicitudes.getByRole('button', { name: 'Aprobar solicitud de Carlos Méndez para Multímetro digital' }),
+      solicitudes.getByRole('button', { name: 'Rechazar solicitud de Carlos Méndez para Multímetro digital' }),
+      solicitudes.getByRole('link', { name: 'Ver Multímetro digital' }),
+    ]) {
+      expect(accion).toHaveClass('h-9', 'w-9', 'text-brand-600/70', 'hover:bg-brand-500/10')
+      expect(accion.querySelector('svg')).toHaveAttribute('stroke-width', '2')
+    }
 
     const resumen = within(screen.getByRole('region', { name: 'Resumen' }))
     expect(resumen.getByText('Total de herramientas').closest('article')).toHaveTextContent('3')

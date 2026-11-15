@@ -48,15 +48,23 @@ describe('Entrega y devolución', () => {
   test('muestra la fecha de entrega en lugar del estado', async () => {
     renderAdminEntrega()
 
-    const tabla = within(await screen.findByRole('table'))
+    const region = await screen.findByRole('region', { name: 'Tabla de entregas y devoluciones' })
+    expect(region).toHaveAttribute('tabindex', '0')
+    expect(region).toHaveClass('max-h-[70vh]', 'overflow-y-auto', 'overflow-x-hidden', 'scroll-tabla')
+
+    const elementoTabla = await screen.findByRole('table')
+    expect(elementoTabla).toHaveClass('table-fixed')
+    const tabla = within(elementoTabla)
+    expect(tabla.getByRole('columnheader', { name: 'ID' })).toBeInTheDocument()
     expect(tabla.getByRole('columnheader', { name: 'Fecha de entrega' })).toBeInTheDocument()
     expect(tabla.queryByRole('columnheader', { name: 'Estado' })).not.toBeInTheDocument()
+    expect(tabla.getByText('1')).toBeInTheDocument()
     expect(await tabla.findByText(new Date(prestamos[0].fechaEntrega).toLocaleDateString('es-EC'))).toBeInTheDocument()
     expect(tabla.getByText('Pendiente')).toBeInTheDocument()
     expect(tabla.queryByText('Laptop')).not.toBeInTheDocument()
   })
 
-  test('filtra las filas por categoría', async () => {
+  test('busca recursos sin distinguir tildes y filtra las filas por estado', async () => {
     const user = userEvent.setup()
     renderAdminEntrega()
 
@@ -64,9 +72,16 @@ describe('Entrega y devolución', () => {
     expect(await tabla.findByText('Multímetro')).toBeInTheDocument()
     expect(tabla.getByText('Libro de cálculo')).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por categoría' }), 'academico')
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar estudiante o recurso...' }), 'multimetro')
+
+    expect(tabla.getByText('Multímetro')).toBeInTheDocument()
+    expect(tabla.queryByText('Libro de cálculo')).not.toBeInTheDocument()
+
+    await user.clear(screen.getByRole('searchbox', { name: 'Buscar estudiante o recurso...' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por estado' }), 'aprobado')
 
     expect(tabla.getByText('Libro de cálculo')).toBeInTheDocument()
     expect(tabla.queryByText('Multímetro')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'En revisión' })).not.toBeInTheDocument()
   })
 })

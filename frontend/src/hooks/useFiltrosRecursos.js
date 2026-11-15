@@ -6,10 +6,10 @@ import { CATEGORIAS, ESTADOS } from '../utils/recursos.jsx'
 const valido = (lista, valor) => (lista.some((x) => x.valor === valor) ? valor : '')
 
 /* Filtros del catálogo guardados en la URL (?categoria=&estado=&buscar=) para poder compartir el enlace */
-export default function useFiltrosRecursos() {
+export default function useFiltrosRecursos({ incluirCategoria = true } = {}) {
   const [params, setParams] = useSearchParams()
   const [buscar, setBuscar] = useState(params.get('buscar') ?? '')
-  const categoria = valido(CATEGORIAS, params.get('categoria'))
+  const categoria = incluirCategoria ? valido(CATEGORIAS, params.get('categoria')) : ''
   const estado = valido(ESTADOS, params.get('estado'))
   const buscarDiferido = useDebounce(buscar.trim())
 

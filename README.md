@@ -42,6 +42,8 @@ Las variables del **backend** son secretas y solo se configuran en el servicio d
 | `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN` | ✅ | — |
 | `FRONTEND_URL` (origen permitido por CORS) | ✅ | — |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | ✅ | — |
+| `GEMINI_API_KEY` (opcional; sin ella se usa el asistente local) | ✅ | — |
+| `GEMINI_MODEL`, `GEMINI_TIMEOUT_MS` (opcionales) | ✅ | — |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (correo de recuperación) | ✅ | — |
 | `INSTITUTIONAL_EMAIL_DOMAIN` | ✅ | — |
 | `PENALIZACION_ATRASO_DIA` (5), `PENALIZACION_DANIO` (20), `PENALIZACION_PERDIDA` (100): penalizaciones en % del precio del recurso | ✅ | — |

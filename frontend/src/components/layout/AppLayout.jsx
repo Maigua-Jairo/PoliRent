@@ -135,59 +135,56 @@ function BarraLateral({ usuario, onNavegar }) {
 function Notificaciones() {
   const [abierto, setAbierto] = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
-  const [cargando, setCargando] = useState(false)
+  const [noLeidas, setNoLeidas] = useState(0)
+  const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [version, setVersion] = useState(0)
 
-  const recargar = async () => {
-    try {
-      setCargando(true)
-      const respuesta = await listarNotificaciones()
-      setNotificaciones(respuesta.notificaciones ?? [])
-      setError('')
-    } catch (e) {
-      setError(obtenerMensajeError(e))
-    } finally {
-      setCargando(false)
+  useEffect(() => {
+    let vigente = true
+    let consultando = false
+    const controlador = new AbortController()
+
+    const actualizar = async () => {
+      if (consultando || document.visibilityState !== 'visible') return
+      consultando = true
+      try {
+        const respuesta = await listarNotificaciones({}, { signal: controlador.signal })
+        if (vigente) {
+          setNotificaciones(respuesta.notificaciones ?? [])
+          setNoLeidas(respuesta.noLeidas ?? respuesta.notificaciones?.filter((n) => !n.leida).length ?? 0)
+          setError('')
+        }
+      } catch (e) {
+        if (vigente && !controlador.signal.aborted) setError(obtenerMensajeError(e))
+      } finally {
+        consultando = false
+        if (vigente) setCargando(false)
+      }
     }
-  }
 
-  useEffect(() => {
-    if (!abierto) return
-    const controlador = new AbortController()
-    listarNotificaciones({}, { signal: controlador.signal })
-      .then((respuesta) => {
-        if (!controlador.signal.aborted) setNotificaciones(respuesta.notificaciones ?? [])
-      })
-      .catch((e) => {
-        if (!controlador.signal.aborted) setError(obtenerMensajeError(e))
-      })
-      .finally(() => {
-        if (!controlador.signal.aborted) setCargando(false)
-      })
-    return () => controlador.abort()
-  }, [abierto])
+    const actualizarSiVisible = () => {
+      if (document.visibilityState === 'visible') actualizar()
+    }
 
-  useEffect(() => {
-    const controlador = new AbortController()
-    listarNotificaciones({}, { signal: controlador.signal })
-      .then((respuesta) => {
-        if (!controlador.signal.aborted) setNotificaciones(respuesta.notificaciones ?? [])
-      })
-      .catch((e) => {
-        if (!controlador.signal.aborted) setError(obtenerMensajeError(e))
-      })
-      .finally(() => {
-        if (!controlador.signal.aborted) setCargando(false)
-      })
-    return () => controlador.abort()
-  }, [])
+    actualizar()
+    const intervalo = window.setInterval(actualizarSiVisible, 30_000)
+    document.addEventListener('visibilitychange', actualizarSiVisible)
+    window.addEventListener('focus', actualizarSiVisible)
 
-  const noLeidas = notificaciones.filter((n) => !n.leida).length
+    return () => {
+      vigente = false
+      window.clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', actualizarSiVisible)
+      window.removeEventListener('focus', actualizarSiVisible)
+      controlador.abort()
+    }
+  }, [version])
 
   const marcarLeida = async (id) => {
     try {
       await marcarNotificacionLeida(id)
-      await recargar()
+      setVersion((actual) => actual + 1)
     } catch (e) {
       setError(obtenerMensajeError(e))
     }
@@ -196,17 +193,22 @@ function Notificaciones() {
   const marcarTodas = async () => {
     try {
       await marcarTodasNotificacionesLeidas()
-      await recargar()
+      setVersion((actual) => actual + 1)
     } catch (e) {
       setError(obtenerMensajeError(e))
     }
+  }
+
+  const alternarAbierto = () => {
+    if (!abierto) setVersion((actual) => actual + 1)
+    setAbierto((actual) => !actual)
   }
 
   return (
     <div className="relative" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setAbierto(false)}>
       <button
         type="button"
-        onClick={() => setAbierto((v) => !v)}
+        onClick={alternarAbierto}
         aria-expanded={abierto}
         aria-label="Notificaciones"
         className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"

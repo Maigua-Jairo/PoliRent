@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Dashboard from './Dashboard.jsx'
@@ -11,9 +11,17 @@ import { iniciales } from '../utils/usuario.js'
 import { useAuthStore } from '../store/authStore.js'
 import * as prestamoService from '../services/prestamoService.js'
 import * as recomendacionService from '../services/recomendacionService.js'
+import * as asistenteService from '../services/asistenteService.js'
+import * as notificacionService from '../services/notificacionService.js'
 
 vi.mock('../services/prestamoService.js', () => ({ listarMisPrestamos: vi.fn() }))
 vi.mock('../services/recomendacionService.js', () => ({ obtenerRecomendaciones: vi.fn() }))
+vi.mock('../services/asistenteService.js', () => ({ conversarConAsistente: vi.fn() }))
+vi.mock('../services/notificacionService.js', () => ({
+  listarNotificaciones: vi.fn().mockResolvedValue({ notificaciones: [] }),
+  marcarNotificacionLeida: vi.fn(),
+  marcarTodasNotificacionesLeidas: vi.fn(),
+}))
 
 const usuario = {
   id: '1',
@@ -61,6 +69,16 @@ beforeEach(() => {
     total: 1,
     recomendaciones: [{ recurso: { _id: 'r9', nombre: 'Microscopio óptico', descripcion: 'Para laboratorios', categoria: 'academico', imagen: 'https://res.cloudinary.com/demo/micro.jpg' }, razon: 'Coincide con tu facultad' }],
   })
+  asistenteService.conversarConAsistente.mockResolvedValue({
+    tipo: 'recomendacion',
+    respuesta: 'Encontré recursos relacionados con tu consulta:',
+    enlaces: [],
+    recomendaciones: [{ recurso: { _id: 'r9', nombre: 'Microscopio óptico', descripcion: 'Para laboratorios', categoria: 'academico', imagen: 'https://res.cloudinary.com/demo/micro.jpg' }, razon: 'Coincide con tu facultad' }],
+  })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('Dashboard del estudiante', () => {
@@ -74,6 +92,34 @@ describe('Dashboard del estudiante', () => {
     renderPanel()
     expect(screen.getByText('Landing')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Abrir asistente PoliRent' })).not.toBeInTheDocument()
+  })
+
+  test('actualiza las notificaciones automáticamente cada 30 segundos', async () => {
+    vi.useFakeTimers()
+    const notificacion = { _id: 'n1', leida: false, mensaje: 'Tu solicitud fue aprobada', createdAt: '2026-11-11T12:00:00Z' }
+    notificacionService.listarNotificaciones
+      .mockResolvedValueOnce({ notificaciones: [], noLeidas: 0 })
+      .mockResolvedValueOnce({
+        notificaciones: [notificacion],
+        noLeidas: 1,
+      })
+      .mockResolvedValue({ notificaciones: [notificacion], noLeidas: 1 })
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel()
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(notificacionService.listarNotificaciones).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(notificacionService.listarNotificaciones).toHaveBeenCalledTimes(2)
+    expect(within(screen.getByRole('button', { name: 'Notificaciones' })).getByText('1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Notificaciones' }))
+    expect(screen.getByText('Tu solicitud fue aprobada')).toBeInTheDocument()
   })
 
   test('muestra el saludo, los movimientos y las recomendaciones con su reserva', async () => {
@@ -148,23 +194,17 @@ describe('Dashboard del estudiante', () => {
     expect(navegacion.queryByRole('link', { name: 'Recursos' })).not.toBeInTheDocument()
   })
 
-  test('el botón flotante abre el chat en recomendaciones y responde dudas del sistema', async () => {
+  test('oculta el asistente flotante en recomendaciones inteligentes', () => {
     useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
     renderPanel('/recomendaciones')
 
     expect(screen.getByText('Pantalla de recomendaciones')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
-    expect(screen.getByRole('region', { name: 'Chat de ayuda PoliRent' })).toBeInTheDocument()
-    await userEvent.type(screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' }), 'Necesito herramientas para electrónica')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
-
-    expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
-      { contexto: 'Necesito herramientas para electrónica', limite: 10 },
-    )
-    expect(await screen.findByText('Encontré recursos relacionados con tu consulta:')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Abrir asistente PoliRent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Chat de ayuda PoliRent' })).not.toBeInTheDocument()
+    expect(asistenteService.conversarConAsistente).not.toHaveBeenCalled()
   })
 
-  test('el chat envía una pregunta al mismo servicio de recomendaciones', async () => {
+  test('el chat envía una pregunta al servicio del asistente', async () => {
     useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
     renderPanel()
 
@@ -172,10 +212,48 @@ describe('Dashboard del estudiante', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' }), '¿Qué recursos sirven para electrónica?')
     await userEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
 
-    expect(recomendacionService.obtenerRecomendaciones).toHaveBeenCalledWith(
-      { contexto: '¿Qué recursos sirven para electrónica?', limite: 10 },
+    expect(asistenteService.conversarConAsistente).toHaveBeenCalledWith(
+      { mensaje: '¿Qué recursos sirven para electrónica?', historial: [] },
     )
     expect(await screen.findByText('Encontré recursos relacionados con tu consulta:')).toBeInTheDocument()
+  })
+
+  test('envía consultas cortas con el historial y muestra los enlaces de ayuda del backend', async () => {
+    const user = userEvent.setup()
+    asistenteService.conversarConAsistente
+      .mockResolvedValueOnce({
+        tipo: 'ayuda',
+        respuesta: 'Puedes iniciar sesión desde aquí.',
+        recomendaciones: [],
+        enlaces: [{ texto: 'Iniciar sesión', ruta: '/login' }],
+      })
+      .mockResolvedValueOnce({
+        tipo: 'ayuda',
+        respuesta: 'Escribe tu correo institucional.',
+        recomendaciones: [],
+        enlaces: [],
+      })
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
+    const entrada = screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' })
+    await user.type(entrada, 'hola')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
+
+    expect(await screen.findByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/login')
+
+    await user.type(entrada, '¿Cómo ingreso?')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
+
+    expect(asistenteService.conversarConAsistente).toHaveBeenLastCalledWith({
+      mensaje: '¿Cómo ingreso?',
+      historial: [
+        { rol: 'usuario', texto: 'hola' },
+        { rol: 'asistente', texto: 'Puedes iniciar sesión desde aquí.' },
+      ],
+    })
+    expect(await screen.findByText('Escribe tu correo institucional.')).toBeInTheDocument()
   })
 
   test('/recursos redirige a la sección Recursos de la landing', () => {
