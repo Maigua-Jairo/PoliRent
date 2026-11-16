@@ -238,8 +238,18 @@ describe('Entrega y devolucion', () => {
         const res = await entregar({observaciones: 'Con cable HDMI'})
         expect(res.status).toBe(200)
         expect(res.body).toMatchObject({accion: 'entrega', recurso: {estado: 'prestado'}})
-        expect(res.body.prestamo.entrega).toMatchObject({responsableNombre: 'Luis Paz', observaciones: 'Con cable HDMI', evidencia: null})
+        expect(res.body.prestamo.entrega).toMatchObject({responsableNombre: 'Luis Paz', observaciones: 'Con cable HDMI', condicion: 'bueno', evidencia: null})
         expect(res.body.penalizaciones).toBeUndefined()
+    })
+
+    test('entregar un recurso con condicion informada la devuelve y la persiste', async () => {
+        prestamo = nuevoPrestamo({estado: 'aprobado'})
+        recurso = documento({_id: ID_RECURSO, nombre: 'Proyector Epson', estado: 'disponible', precio: 100})
+        const res = await entregar({condicion: 'incompleto'})
+
+        expect(res.status).toBe(200)
+        expect(prestamo.entrega.condicion).toBe('incompleto')
+        expect(res.body.prestamo.entrega).toMatchObject({condicion: 'incompleto'})
     })
 
     test('el escaneo del QR sigue funcionando con JSON y usa la misma logica', async () => {

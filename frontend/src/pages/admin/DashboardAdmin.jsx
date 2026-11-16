@@ -21,7 +21,7 @@ import { descargarArchivo, generarReporteCSV } from '../../utils/reporte.js'
 /* ---------- Panel principal del administrador (HU-003) ---------- */
 export default function DashboardAdmin() {
   const usuario = useAuthStore((state) => state.usuario)
-  const { cargando, error, prestamos, recursos, ahora, recargar } = useDashboardAdmin()
+  const { cargando, error, errorMetricas, prestamos, recursos, ahora, recargar } = useDashboardAdmin()
   const [aviso, setAviso] = useState({ tipo: 'exito', texto: '' })
   const [aprobando, setAprobando] = useState(false)
   const [aRechazar, setARechazar] = useState(null)
@@ -67,6 +67,7 @@ export default function DashboardAdmin() {
 
       <Alerta tipo={aviso.tipo}>{aviso.texto}</Alerta>
       <Alerta>{error}</Alerta>
+      <Alerta>{errorMetricas}</Alerta>
 
       <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-3">
         <TarjetaResumen

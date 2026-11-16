@@ -23,6 +23,15 @@ import {
 const btnCancelar =
   'inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 px-6 py-3 font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10'
 
+const ETIQUETAS_CONDICION = {
+  bueno: 'Bueno',
+  danado: 'Dañado',
+  incompleto: 'Incompleto',
+  perdido: 'Perdido',
+}
+
+const etiquetaCondicion = (condicion) => ETIQUETAS_CONDICION[condicion] ?? 'Pendiente de registro'
+
 function Fila({ etiqueta, children }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2 text-sm">
@@ -152,7 +161,42 @@ export default function DetallePrestamo() {
           <ul className="mt-4 space-y-4">
             <DatoEntrega icono={iconos.ubicacion} valor={`Retiro en ${INFO_ENTREGA.ubicacion}`} />
             <DatoEntrega icono={iconos.reloj} etiqueta="Horario de atención" valor={INFO_ENTREGA.horario} />
-            <DatoEntrega icono={iconos.cuenta} etiqueta="Responsable" valor={INFO_ENTREGA.responsable} />
+            <DatoEntrega
+              icono={iconos.cuenta}
+              etiqueta="Entregado por"
+              valor={prestamo.entrega?.responsableNombre ?? 'Se registrará al momento de retirar el recurso.'}
+            />
+            <DatoEntrega
+              icono={iconos.recursos}
+              etiqueta="Condición al recibir"
+              valor={etiquetaCondicion(prestamo.entrega?.condicion)}
+            />
+            {prestamo.entrega?.observaciones && (
+              <DatoEntrega icono={iconos.historial} etiqueta="Observaciones de entrega" valor={prestamo.entrega.observaciones} />
+            )}
+            {prestamo.entrega?.evidencia?.url && (
+              <DatoEntrega
+                icono={iconos.ojo}
+                etiqueta="Evidencia de entrega"
+                valor={<a href={prestamo.entrega.evidencia.url} target="_blank" rel="noreferrer" className="text-brand-600 underline dark:text-brand-400">Ver foto</a>}
+              />
+            )}
+            {prestamo.devolucion && (
+              <>
+                <DatoEntrega icono={iconos.cuenta} etiqueta="Recibido por" valor={prestamo.devolucion.responsableNombre} />
+                <DatoEntrega icono={iconos.recursos} etiqueta="Condición al devolver" valor={etiquetaCondicion(prestamo.devolucion.condicion)} />
+                {prestamo.devolucion.observaciones && (
+                  <DatoEntrega icono={iconos.historial} etiqueta="Observaciones de devolución" valor={prestamo.devolucion.observaciones} />
+                )}
+                {prestamo.devolucion.evidencia?.url && (
+                  <DatoEntrega
+                    icono={iconos.ojo}
+                    etiqueta="Evidencia de devolución"
+                    valor={<a href={prestamo.devolucion.evidencia.url} target="_blank" rel="noreferrer" className="text-brand-600 underline dark:text-brand-400">Ver foto</a>}
+                  />
+                )}
+              </>
+            )}
           </ul>
         </section>
 

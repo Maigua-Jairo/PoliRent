@@ -9,6 +9,7 @@ import PublicLayout from '../components/layout/PublicLayout.jsx'
 import RutaProtegida from '../components/routes/RutaProtegida.jsx'
 import { iniciales } from '../utils/usuario.js'
 import { useAuthStore } from '../store/authStore.js'
+import { useConsultasStore } from '../store/consultasStore.js'
 import * as prestamoService from '../services/prestamoService.js'
 import * as recomendacionService from '../services/recomendacionService.js'
 import * as asistenteService from '../services/asistenteService.js'
@@ -64,6 +65,7 @@ const renderPanel = (ruta = '/dashboard') =>
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthStore.getState().cerrarSesion()
+  useConsultasStore.setState({ porUsuario: {} })
   prestamoService.listarMisPrestamos.mockResolvedValue({ total: PRESTAMOS.length, prestamos: PRESTAMOS })
   recomendacionService.obtenerRecomendaciones.mockResolvedValue({
     total: 1,
@@ -254,6 +256,27 @@ describe('Dashboard del estudiante', () => {
       ],
     })
     expect(await screen.findByText('Escribe tu correo institucional.')).toBeInTheDocument()
+  })
+
+  test('confirma el borrado del chat y de las consultas guardadas', async () => {
+    const user = userEvent.setup()
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir asistente PoliRent' }))
+    const entrada = screen.getByRole('textbox', { name: 'Escribe una pregunta o describe tu proyecto' })
+    await user.type(entrada, '¿Qué recursos sirven para electrónica?')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }))
+    expect(await screen.findByText('Encontré recursos relacionados con tu consulta:')).toBeInTheDocument()
+    expect(useConsultasStore.getState().porUsuario[usuario.correo]).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Borrar historial del asistente' }))
+    const dialogo = within(screen.getByRole('alertdialog', { name: 'Borrar historial del asistente' }))
+    await user.click(dialogo.getByRole('button', { name: 'Sí, borrar historial' }))
+
+    expect(screen.getByText('¡Hola! ¿En qué te ayudo?')).toBeInTheDocument()
+    expect(screen.queryByText('Encontré recursos relacionados con tu consulta:')).not.toBeInTheDocument()
+    expect(useConsultasStore.getState().porUsuario[usuario.correo]).toBeUndefined()
   })
 
   test('/recursos redirige a la sección Recursos de la landing', () => {

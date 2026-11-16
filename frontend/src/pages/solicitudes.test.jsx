@@ -152,6 +152,30 @@ describe('Detalle del préstamo (HU-007)', () => {
     expect(screen.queryByText(/QR/)).not.toBeInTheDocument()
   })
 
+  test('muestra quien entregó el recurso, su condición y la evidencia registrada', async () => {
+    const prestamoEntregado = {
+      _id: 'p-entregado',
+      estado: 'entregado',
+      recurso: laptop,
+      fechaEntrega: '2026-10-12T10:00:00.000Z',
+      fechaDevolucion: '2099-09-22T10:00:00Z',
+      entrega: {
+        responsableNombre: 'María López',
+        condicion: 'incompleto',
+        observaciones: 'Se entrega con un cable faltante',
+        evidencia: { url: 'https://res.cloudinary.com/demo/evidencia.jpg' },
+      },
+    }
+    prestamoService.listarMisPrestamos.mockResolvedValueOnce({ prestamos: [prestamoEntregado] })
+    renderEn('/solicitudes/p-entregado')
+
+    const informacion = within(await screen.findByRole('region', { name: 'Información de entrega y devolución' }))
+    expect(informacion.getByText('María López')).toBeInTheDocument()
+    expect(informacion.getByText('Incompleto')).toBeInTheDocument()
+    expect(informacion.getByText('Se entrega con un cable faltante')).toBeInTheDocument()
+    expect(informacion.getByRole('link', { name: 'Ver foto' })).toHaveAttribute('href', 'https://res.cloudinary.com/demo/evidencia.jpg')
+  })
+
   test('una solicitud rechazada muestra el motivo y no tiene acciones', async () => {
     renderEn('/solicitudes/p3')
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
+import DialogoConfirmacion from '../components/DialogoConfirmacion.jsx'
 import { iconos } from '../components/layout/iconos.jsx'
 import { tarjeta } from '../components/dashboard/comunes.jsx'
 import PanelFiltros from '../components/recomendaciones/PanelFiltros.jsx'
@@ -27,17 +28,21 @@ const respuestaAsistente = (recomendaciones, categoria) => {
   return `¡Perfecto! Para tu proyecto te recomiendo ${cuantos}${filtro}. Están ordenados del más al menos relevante:`
 }
 
+const mensajeBienvenida = () => ({ id: 0, autor: 'asistente', tipo: 'bienvenida', hora: horaActual() })
+
 /* ---------- Asistente de recomendaciones (HU-009) ---------- */
 export default function Recomendaciones() {
   const usuario = useAuthStore((state) => state.usuario)
   const claveUsuario = usuario?.correo ?? usuario?.id ?? 'anonimo'
   const consultas = useConsultasStore((state) => state.porUsuario[claveUsuario] ?? SIN_CONSULTAS)
   const agregarConsulta = useConsultasStore((state) => state.agregarConsulta)
+  const borrarConsultas = useConsultasStore((state) => state.borrarConsultas)
 
-  const [mensajes, setMensajes] = useState(() => [{ id: 0, autor: 'asistente', tipo: 'bienvenida', hora: horaActual() }])
+  const [mensajes, setMensajes] = useState(() => [mensajeBienvenida()])
   const [texto, setTexto] = useState('')
   const [errorTexto, setErrorTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
   const [categoria, setCategoria] = useState('')
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
   const [ahora, setAhora] = useState(() => Date.now())
@@ -45,6 +50,7 @@ export default function Recomendaciones() {
   const siguienteId = useRef(1)
   const conversacion = useRef(null)
   const entrada = useRef(null)
+  const hayHistorial = mensajes.some((mensaje) => mensaje.autor === 'usuario') || consultas.length > 0
 
   // Mantiene visible el último mensaje
   useEffect(() => {
@@ -53,6 +59,16 @@ export default function Recomendaciones() {
   }, [mensajes.length, enviando])
 
   const agregar = (mensaje) => setMensajes((prev) => [...prev, { id: siguienteId.current++, hora: horaActual(), ...mensaje }])
+
+  const borrarHistorial = () => {
+    setMensajes([mensajeBienvenida()])
+    siguienteId.current = 1
+    setTexto('')
+    setErrorTexto('')
+    borrarConsultas(claveUsuario)
+    setAhora(Date.now())
+    setConfirmarBorrado(false)
+  }
 
   const consultar = async (consulta) => {
     const error = validarContexto(consulta)
@@ -111,6 +127,21 @@ export default function Recomendaciones() {
 
       <div className="grid gap-6 xl:grid-cols-12">
         <section aria-label="Conversación con el asistente" className={`${tarjeta} flex min-w-0 flex-col xl:col-span-9`}>
+          <header className="mb-3 flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
+            <div>
+              <h2 className="font-bold text-epn-900 dark:text-white">Asistente de recomendaciones</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tu conversación actual</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmarBorrado(true)}
+              disabled={!hayHistorial || enviando}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+            >
+              <Icon size={16}>{iconos.papelera}</Icon>
+              Borrar historial
+            </button>
+          </header>
           <ol ref={conversacion} className="max-h-[65vh] min-h-80 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6" aria-live="polite">
             {mensajes.map((m) =>
               m.autor === 'usuario' ? (
@@ -186,7 +217,15 @@ export default function Recomendaciones() {
           <ConsultasRecientes consultas={consultas} ahora={ahora} onRepetir={consultar} deshabilitado={enviando} />
         </aside>
       </div>
-
+      <DialogoConfirmacion
+        abierto={confirmarBorrado}
+        titulo="Borrar historial del asistente"
+        textoConfirmar="Sí, borrar historial"
+        onConfirmar={borrarHistorial}
+        onCancelar={() => setConfirmarBorrado(false)}
+      >
+        Se borrarán los mensajes de esta conversación y las consultas recientes guardadas para tu cuenta.
+      </DialogoConfirmacion>
     </div>
   )
 }

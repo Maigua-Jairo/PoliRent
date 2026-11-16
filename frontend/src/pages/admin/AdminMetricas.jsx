@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import useDashboardAdmin from '../../hooks/useDashboardAdmin.js'
 import { tarjeta } from '../../components/dashboard/comunes.jsx'
-import { CATEGORIAS } from '../../utils/recursos.jsx'
+import { buscarEstado, CATEGORIAS } from '../../utils/recursos.jsx'
 import { obtenerMensajeError } from '../../services/authService.js'
-import { consultarReportePrestamos, consultarReporteRecursos } from '../../services/reporteService.js'
+import {
+  consultarReportePenalizaciones,
+  consultarReportePrestamos,
+  consultarReporteRecursos,
+} from '../../services/reporteService.js'
 import { descargarArchivo } from '../../utils/reporte.js'
 
 const coloresCategoria = {
@@ -13,7 +17,14 @@ const coloresCategoria = {
   sin_categoria: '#f59e0b',
 }
 const estadosAprobados = new Set(['aprobado', 'entregado', 'devuelto'])
-const formatearNumero = (valor) => new Intl.NumberFormat('es-EC').format(Number(valor ?? 0))
+const formatearNumero = (valor) => valor === '—' ? valor : new Intl.NumberFormat('es-EC').format(Number(valor ?? 0))
+const formatearMoneda = (valor) => new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(valor ?? 0))
+const etiquetasRazon = {
+  perdido: 'Pérdida',
+  danos_frecuentes: 'Daños frecuentes',
+  alta_demanda: 'Alta demanda',
+  en_mantenimiento: 'En mantenimiento',
+}
 
 const fechaISO = (fecha) => {
   const anio = fecha.getFullYear()
@@ -133,11 +144,19 @@ function DonutChart({ items }) {
 }
 
 export default function AdminMetricas() {
-  const { cargando, error, metricas } = useDashboardAdmin()
+  const { cargando, error, errorMetricas, metricas } = useDashboardAdmin()
   const [periodo, setPeriodo] = useState('30')
   const [fechaActual, setFechaActual] = useState(() => new Date())
   const [tipoReporte, setTipoReporte] = useState('prestamos')
-  const [reportes, setReportes] = useState({ periodo: '30', cargando: true, error: '', prestamos: [], recursos: [] })
+  const [reportes, setReportes] = useState({
+    periodo: '30',
+    cargando: true,
+    error: '',
+    prestamos: [],
+    recursos: [],
+    totalPenalizaciones: 0,
+    totalMontoPenalizaciones: 0,
+  })
   const [generando, setGenerando] = useState(false)
   const [errorGeneracion, setErrorGeneracion] = useState('')
   const rango = obtenerRangoFechas(periodo, fechaActual)
@@ -149,8 +168,9 @@ export default function AdminMetricas() {
     Promise.all([
       consultarReportePrestamos(rangoConsulta),
       consultarReporteRecursos(rangoConsulta),
+      consultarReportePenalizaciones(rangoConsulta),
     ])
-      .then(([respuestaPrestamos, respuestaRecursos]) => {
+      .then(([respuestaPrestamos, respuestaRecursos, respuestaPenalizaciones]) => {
         if (controlador.signal.aborted) return
         setReportes({
           periodo,
@@ -158,6 +178,8 @@ export default function AdminMetricas() {
           error: '',
           prestamos: respuestaPrestamos.prestamos ?? [],
           recursos: respuestaRecursos.recursos ?? [],
+          totalPenalizaciones: respuestaPenalizaciones.total ?? 0,
+          totalMontoPenalizaciones: respuestaPenalizaciones.totalMonto ?? 0,
         })
       })
       .catch((e) => {
@@ -173,11 +195,13 @@ export default function AdminMetricas() {
     setGenerando(true)
     setErrorGeneracion('')
     try {
-      const esReportePrestamos = tipoReporte === 'prestamos'
-      const archivo = esReportePrestamos
-        ? await consultarReportePrestamos({ ...rango, formato: 'csv' })
-        : await consultarReporteRecursos({ ...rango, formato: 'csv' })
-      const tipo = esReportePrestamos ? 'prestamos' : 'recursos'
+      const consultarCSV = {
+        prestamos: consultarReportePrestamos,
+        recursos: consultarReporteRecursos,
+        penalizaciones: consultarReportePenalizaciones,
+      }[tipoReporte]
+      const archivo = await consultarCSV({ ...rango, formato: 'csv' })
+      const tipo = tipoReporte
       descargarArchivo(archivo, `reporte-polirent-${tipo}-${rango.hasta}.csv`)
     } catch (e) {
       setErrorGeneracion(obtenerMensajeError(e))
@@ -201,7 +225,7 @@ export default function AdminMetricas() {
     color: coloresCategoria[valor] ?? '#3b82f6',
   }))
   const resumen = [
-    { label: 'Total de Recursos', valor: metricas?.recursos?.total ?? 0, color: '#3b82f6' },
+    { label: 'Total de Recursos', valor: metricas ? metricas.recursos?.total ?? 0 : '—', color: '#3b82f6' },
     { label: 'Solicitudes Totales', valor: prestamos.length, color: '#8b5cf6' },
     { label: 'Solicitudes Aprobadas', valor: aprobadas, color: '#10b981' },
     { label: 'Usuarios Activos', valor: usuariosActivos, color: '#f59e0b' },
@@ -236,6 +260,7 @@ export default function AdminMetricas() {
 
       {(cargando || cargandoReportes) && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando métricas…</p>}
       {!cargando && error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {!cargando && errorMetricas && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{errorMetricas}</p>}
       {!cargandoReportes && reportes.error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{reportes.error}</p>}
       {errorGeneracion && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{errorGeneracion}</p>}
 
@@ -249,6 +274,84 @@ export default function AdminMetricas() {
                 <div className="mt-3 h-1 rounded-full" style={{ backgroundColor: item.color }} />
               </div>
             ))}
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section aria-labelledby="titulo-penalizaciones-resumen" className={`${tarjeta} p-5`}>
+              <div className="mb-5">
+                <h2 id="titulo-penalizaciones-resumen" className="text-lg font-bold text-epn-900 dark:text-white">Penalizaciones</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Resumen por estado y monto vigente por tipo.</p>
+              </div>
+              {metricas?.penalizaciones ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { etiqueta: 'Pendientes', cantidad: metricas.penalizaciones.pendientes?.cantidad, monto: metricas.penalizaciones.pendientes?.monto },
+                      { etiqueta: 'Pagadas', cantidad: metricas.penalizaciones.pagadas?.cantidad, monto: metricas.penalizaciones.pagadas?.monto },
+                      { etiqueta: 'Anuladas', cantidad: metricas.penalizaciones.anuladas?.cantidad, monto: null },
+                    ].map((item) => (
+                      <div key={item.etiqueta} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{item.etiqueta}</p>
+                        <p className="mt-1 text-2xl font-extrabold text-epn-900 dark:text-white">{formatearNumero(item.cantidad)}</p>
+                        {item.monto !== null && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{formatearMoneda(item.monto)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 pt-4 text-sm dark:border-slate-700">
+                    {[
+                      ['Atraso', metricas.penalizaciones.montoPorTipo?.atraso],
+                      ['Daño o incompleto', metricas.penalizaciones.montoPorTipo?.danio],
+                      ['Pérdida', metricas.penalizaciones.montoPorTipo?.perdida],
+                    ].map(([etiqueta, monto]) => (
+                      <p key={etiqueta} className="text-slate-600 dark:text-slate-300">
+                        {etiqueta}: <span className="font-semibold text-epn-900 dark:text-white">{formatearMoneda(monto)}</span>
+                      </p>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">Resumen de penalizaciones no disponible.</p>
+              )}
+            </section>
+
+            <section aria-labelledby="titulo-reposicion" className={`${tarjeta} p-5`}>
+              <div className="mb-5">
+                <h2 id="titulo-reposicion" className="text-lg font-bold text-epn-900 dark:text-white">Recursos por reponer o ampliar</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Prioridad según pérdidas, incidentes, demanda y mantenimiento.</p>
+              </div>
+              {Array.isArray(metricas?.recursosParaReponer) ? (
+                metricas.recursosParaReponer.length ? (
+                  <ul className="space-y-3">
+                    {metricas.recursosParaReponer.map((item) => (
+                      <li key={item.recurso?._id ?? item.recurso?.nombre} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-epn-900 dark:text-white">{item.recurso?.nombre ?? 'Recurso sin nombre'}</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {buscarEstado(item.recurso?.estado).etiqueta} · {formatearNumero(item.vecesPrestado)} préstamos · {formatearNumero(item.incidentes)} incidentes
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                            {formatearNumero(item.ocupacion30Dias)} % de ocupación
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {(item.razones ?? []).map((razon) => (
+                            <span key={razon} className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                              {etiquetasRazon[razon] ?? razon}
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No hay recursos que requieran reposición o ampliación.</p>
+                )
+              ) : (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">Datos de reposición no disponibles.</p>
+              )}
+            </section>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.8fr_1fr]">
@@ -295,6 +398,7 @@ export default function AdminMetricas() {
                 {[
                   { id: 'prestamos', etiqueta: 'Reporte de préstamos', icono: '📊' },
                   { id: 'recursos', etiqueta: 'Reporte de recursos', icono: '📦' },
+                  { id: 'penalizaciones', etiqueta: 'Reporte de penalizaciones', icono: '⚠️' },
                 ].map((reporte) => (
                   <button
                     key={reporte.id}
@@ -312,6 +416,11 @@ export default function AdminMetricas() {
                   </button>
                 ))}
               </div>
+              {tipoReporte === 'penalizaciones' && (
+                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  {formatearNumero(reportes.totalPenalizaciones)} registros · {formatearMoneda(reportes.totalMontoPenalizaciones)} no anulados en el período.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={generarReporte}

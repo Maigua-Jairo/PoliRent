@@ -62,6 +62,7 @@ const PrestamoSchema = new Schema({
         responsable: {type: Schema.Types.ObjectId, ref: 'Usuario'},
         responsableNombre: String,
         observaciones: String,
+        condicion: {type: String, enum: CONDICIONES},
         evidencia: {url: String, publicId: String}
     },
     // quien recibio el recurso, en que condicion volvio y la evidencia

@@ -31,7 +31,7 @@ const camposMovimiento = (conCondicion, conCodigo = false) => {
         ...(conCodigo ? {codigo: {type: 'string', pattern: '^[0-9a-fA-F]{32}$', description: 'Texto de 32 caracteres leido del QR', example: '9f86d081884c7d659a2feaa0c55ad015'}} : {}),
         responsable: {type: 'string', minLength: 3, maxLength: 100, description: 'Quien entrega o recibe fisicamente el recurso. Por defecto, nombres y apellidos del administrador autenticado', example: 'Maria Lopez'},
         observaciones: {type: 'string', maxLength: 300, example: 'Se entrega con cable HDMI y control remoto'},
-        ...(conCondicion ? {condicion: {type: 'string', enum: CONDICIONES, default: 'bueno', description: 'Solo en la devolucion. `danado` e `incompleto` exigen la foto de evidencia'}} : {})
+        ...(conCondicion ? {condicion: {type: 'string', enum: CONDICIONES, default: 'bueno', description: 'Condicion al entregar o recibir el recurso. En devoluciones, `danado` e `incompleto` exigen la foto de evidencia'}} : {})
     }
     const requeridos = conCodigo ? ['codigo'] : []
     return {required: conCodigo, content: {
@@ -54,7 +54,7 @@ const respuestaMovimiento = {type: 'object', properties: {
 
 const reglasMovimiento = [
     '- Solo entre las **07:00 y las 18:00 (hora de Ecuador)** (`HORARIO_INICIO`, `HORARIO_FIN`; `VALIDAR_HORARIO=false` lo desactiva). Declarar una perdida (`condicion: perdido`) no valida el horario.',
-    '- Se guarda quien entrega o recibe (`responsable`, por defecto el administrador), `observaciones` y la foto opcional `evidencia` (obligatoria al devolver `danado` o `incompleto`).',
+    '- Se guarda quien entrega o recibe (`responsable`, por defecto el administrador), la condicion, `observaciones` y la foto opcional `evidencia` (obligatoria al devolver `danado` o `incompleto`). La condicion de entrega por defecto es `bueno`.',
     '- **Entrega**: `aprobado` pasa a `entregado` y el recurso a `prestado`.',
     '- **Devolucion**: `entregado` pasa a `devuelto` y el codigo QR se elimina. El recurso vuelve a `disponible` si la condicion es `bueno` y queda en `mantenimiento` en cualquier otro caso.',
     '  Se crean las penalizaciones segun el precio del recurso (valores por defecto, ver GET /api/terminos): atraso 5 % por dia o fraccion, dano/incompleto 20 %, perdida 100 % (sin sumar atraso), con un tope del 100 % del precio por prestamo. Se notifica al estudiante.'
@@ -147,7 +147,7 @@ export default {
                     responsable: {...ID_SCHEMA, description: 'Id del administrador que la registro'},
                     responsableNombre: {type: 'string', example: 'Maria Lopez'},
                     observaciones: {type: 'string'},
-                    condicion: {type: 'string', enum: CONDICIONES, description: 'Solo en la devolucion'},
+                    condicion: {type: 'string', enum: CONDICIONES, description: 'Condicion del recurso en la entrega o devolucion'},
                     evidencia: {type: 'object', nullable: true, properties: {url: {type: 'string', example: 'https://res.cloudinary.com/.../evidencia.jpg'}}}
                 }
             },
@@ -659,7 +659,7 @@ export default {
                 tags: ['Prestamos - Administrador (HU-003)'], summary: 'Registrar la entrega de un prestamo aprobado (administrador)', operationId: 'entregarPrestamo', security: conToken,
                 description: `Alternativa al escaneo del QR. El prestamo debe estar \`aprobado\` y el recurso \`disponible\`. JSON o \`multipart/form-data\`.\n\n${reglasMovimiento}`,
                 parameters: [idRuta('Id del prestamo')],
-                requestBody: camposMovimiento(false),
+                requestBody: camposMovimiento(true),
                 responses: {
                     200: ok('Entrega registrada', respuestaMovimiento),
                     400: error('Id o datos invalidos, prestamo no aprobado o fuera de horario', 'Solo se puede registrar la entrega de una solicitud aprobada (la solicitud esta pendiente)'),

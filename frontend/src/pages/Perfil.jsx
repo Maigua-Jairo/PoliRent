@@ -146,8 +146,18 @@ function FormularioDatos({ usuario, onActualizado }) {
           <Field id="telefono" label="Teléfono" icon="phone" error={errors.telefono?.message}>
             <input {...campo('telefono', validarTelefono)} type="tel" inputMode="numeric" maxLength={10} autoComplete="tel" />
           </Field>
-          <Field id="facultad" label="Facultad" icon="cap" error={errors.facultad?.message}>
-            <select {...campo('facultad', validarFacultad)} className={inputClass(errors.facultad, true, true)}>
+          <Field
+            id="facultad"
+            label="Facultad"
+            icon="cap"
+            error={errors.facultad?.message}
+            hint={!esAdministrador(usuario) ? 'La facultad identifica desde dónde solicitas recursos y no se puede cambiar.' : undefined}
+          >
+            <select
+              {...campo('facultad', validarFacultad)}
+              disabled={!esAdministrador(usuario)}
+              className={`${inputClass(errors.facultad, true, true)} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:disabled:bg-slate-800/60 dark:disabled:text-slate-400`}
+            >
               <option value="" disabled>
                 Selecciona tu facultad
               </option>
@@ -167,10 +177,6 @@ function FormularioDatos({ usuario, onActualizado }) {
           <div className="grid h-36 w-36 place-items-center rounded-2xl bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
             <Avatar usuario={usuario} tamano="xl" />
           </div>
-          {/* Provisional: el backend aún no guarda la foto de perfil */}
-          <button type="button" disabled title="Disponible próximamente" className={`${btnSecondary} cursor-not-allowed opacity-60`}>
-            Cambiar foto
-          </button>
           <dl className="w-full space-y-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/60">
             {[
               ['Cédula', usuario?.cedula],

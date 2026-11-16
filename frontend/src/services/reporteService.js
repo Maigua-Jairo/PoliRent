@@ -36,3 +36,18 @@ export const consultarReporteRecursos = async ({ desde, hasta, formato } = {}, {
   })
   return data
 }
+
+export const consultarReportePenalizaciones = async ({ desde, hasta, estado, formato } = {}, { signal } = {}) => {
+  const params = {}
+  if (desde) params.desde = desde
+  if (hasta) params.hasta = hasta
+  if (estado) params.estado = estado
+  if (formato) params.formato = formato
+
+  const { data } = await axiosClient.get('/api/reportes/penalizaciones', {
+    params,
+    signal,
+    responseType: formato === 'csv' ? 'blob' : 'json',
+  })
+  return data
+}

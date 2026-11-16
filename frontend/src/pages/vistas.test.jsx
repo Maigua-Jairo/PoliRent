@@ -95,6 +95,7 @@ describe('Perfil (HU-002)', () => {
     renderApp('/perfil')
 
     expect(screen.getByText('1712345675')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cambiar foto' })).not.toBeInTheDocument()
     const telefono = screen.getByLabelText('Teléfono')
     await userEvent.clear(telefono)
     await userEvent.type(telefono, '0987654321')
@@ -103,6 +104,27 @@ describe('Perfil (HU-002)', () => {
     expect(await screen.findByText('Perfil actualizado correctamente')).toBeInTheDocument()
     expect(authService.actualizarPerfil).toHaveBeenCalledWith(expect.objectContaining({ telefono: '0987654321' }))
     expect(useAuthStore.getState().usuario.telefono).toBe('0987654321')
+  })
+
+  test('un estudiante no puede cambiar la facultad de su perfil', async () => {
+    authService.obtenerPerfil.mockResolvedValue({ usuario })
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    renderApp('/perfil')
+
+    const facultad = await screen.findByLabelText('Facultad')
+    expect(facultad).toBeDisabled()
+    expect(facultad).toHaveValue(usuario.facultad)
+    expect(screen.getByText(/La facultad identifica desde dónde solicitas recursos/)).toBeInTheDocument()
+  })
+
+  test('el campo de facultad sigue disponible para un administrador', async () => {
+    const administrador = { ...usuario, rol: 'administrador' }
+    authService.obtenerPerfil.mockResolvedValue({ usuario: administrador })
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario: administrador })
+    renderApp('/perfil')
+
+    expect(await screen.findByLabelText('Facultad')).toBeEnabled()
+    expect(screen.queryByText(/La facultad identifica desde dónde solicitas recursos/)).not.toBeInTheDocument()
   })
 
   test('la pestaña Seguridad muestra el cambio de contraseña', async () => {

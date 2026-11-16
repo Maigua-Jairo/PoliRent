@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Icon from '../Icon.jsx'
+import DialogoConfirmacion from '../DialogoConfirmacion.jsx'
 import { iconos } from '../layout/iconos.jsx'
 import { obtenerMensajeError } from '../../services/authService.js'
 import { conversarConAsistente } from '../../services/asistenteService.js'
@@ -8,16 +9,29 @@ import { useAuthStore } from '../../store/authStore.js'
 import { useConsultasStore } from '../../store/consultasStore.js'
 import { CONTEXTO_MAX } from '../../utils/recomendaciones.js'
 
+const SIN_CONSULTAS = []
+
 export default function AsistenteFlotante() {
   const { pathname } = useLocation()
   const usuario = useAuthStore((state) => state.usuario)
   const agregarConsulta = useConsultasStore((state) => state.agregarConsulta)
+  const borrarConsultas = useConsultasStore((state) => state.borrarConsultas)
   const [abierto, setAbierto] = useState(false)
   const [texto, setTexto] = useState('')
   const [mensajes, setMensajes] = useState([])
   const [enviando, setEnviando] = useState(false)
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
   const entrada = useRef(null)
   const claveUsuario = usuario?.correo ?? usuario?.id ?? 'anonimo'
+  const consultas = useConsultasStore((state) => state.porUsuario[claveUsuario] ?? SIN_CONSULTAS)
+  const hayHistorial = mensajes.length > 0 || consultas.length > 0
+
+  const borrarHistorial = () => {
+    setMensajes([])
+    setTexto('')
+    borrarConsultas(claveUsuario)
+    setConfirmarBorrado(false)
+  }
 
   const enviar = async (valor = texto) => {
     const pregunta = valor.trim()
@@ -74,14 +88,26 @@ export default function AsistenteFlotante() {
                 <p className="text-xs text-slate-300">Ayuda y recomendaciones</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setAbierto(false)}
-              aria-label="Cerrar chat"
-              className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white"
-            >
-              <Icon size={18}>{iconos.cerrar}</Icon>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setConfirmarBorrado(true)}
+                disabled={!hayHistorial || enviando}
+                aria-label="Borrar historial del asistente"
+                title="Borrar historial"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon size={18}>{iconos.papelera}</Icon>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbierto(false)}
+                aria-label="Cerrar chat"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white"
+              >
+                <Icon size={18}>{iconos.cerrar}</Icon>
+              </button>
+            </div>
           </header>
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3 dark:bg-slate-950/60" aria-live="polite">
@@ -210,6 +236,15 @@ export default function AsistenteFlotante() {
           </span>
         )}
       </button>
+      <DialogoConfirmacion
+        abierto={confirmarBorrado}
+        titulo="Borrar historial del asistente"
+        textoConfirmar="Sí, borrar historial"
+        onConfirmar={borrarHistorial}
+        onCancelar={() => setConfirmarBorrado(false)}
+      >
+        Se borrarán los mensajes de esta conversación y las consultas recientes guardadas para tu cuenta.
+      </DialogoConfirmacion>
     </div>
   )
 }

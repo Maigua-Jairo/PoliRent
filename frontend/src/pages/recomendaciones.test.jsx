@@ -85,6 +85,28 @@ describe('Recomendaciones inteligentes (HU-009)', () => {
     expect(recientes.getByRole('button', { name: /Proyecto de visión por computadora/ }).querySelector('svg')).toBeNull()
   })
 
+  test('confirma el borrado de la conversación y las consultas recientes', async () => {
+    const user = userEvent.setup()
+    useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
+    useConsultasStore.setState({
+      porUsuario: { [usuario.correo]: [{ texto: 'Consulta anterior', fecha: Date.now() }] },
+    })
+    renderPagina()
+
+    await user.type(screen.getByLabelText('Describe tu proyecto'), 'Proyecto de visión por computadora')
+    await user.click(screen.getByRole('button', { name: 'Enviar consulta' }))
+    expect(await screen.findByText('Cámara Raspberry Pi HQ')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Borrar historial' }))
+
+    const dialogo = within(screen.getByRole('alertdialog', { name: 'Borrar historial del asistente' }))
+    await user.click(dialogo.getByRole('button', { name: 'Sí, borrar historial' }))
+
+    expect(screen.getByText(/¡Hola, Jairo!/)).toBeInTheDocument()
+    expect(screen.queryByText('Proyecto de visión por computadora')).not.toBeInTheDocument()
+    expect(screen.queryByText('Consulta anterior')).not.toBeInTheDocument()
+    expect(useConsultasStore.getState().porUsuario[usuario.correo]).toBeUndefined()
+  })
+
   test('los filtros están ocultos hasta pedirlos y limitan la categoría', async () => {
     useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario })
     renderPagina()

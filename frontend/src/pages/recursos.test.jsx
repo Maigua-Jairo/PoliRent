@@ -98,6 +98,25 @@ describe('Gestión de recursos (HU-003)', () => {
     expect(await screen.findByText('Recurso eliminado correctamente')).toBeInTheDocument()
   })
 
+  test('el administrador identifica y puede filtrar recursos en mantenimiento', async () => {
+    const user = userEvent.setup()
+    sesion('administrador')
+    recursoService.listarRecursos.mockResolvedValue({
+      total: 1,
+      recursos: [{ _id: 'm1', nombre: 'Osciloscopio', categoria: 'tecnico', estado: 'mantenimiento', imagen: '' }],
+    })
+    renderEn('/admin/recursos')
+
+    expect(await screen.findByText('Mantenimiento')).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por estado' }), 'mantenimiento')
+    await waitFor(() => {
+      expect(recursoService.listarRecursos).toHaveBeenLastCalledWith(
+        { categoria: '', estado: 'mantenimiento', buscar: '' },
+        expect.anything(),
+      )
+    })
+  })
+
   test('no permite eliminar un recurso prestado', async () => {
     sesion('administrador')
     renderEn('/admin/recursos')

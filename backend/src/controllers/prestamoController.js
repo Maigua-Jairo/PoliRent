@@ -267,12 +267,12 @@ const registrarMovimiento = async (req, res, prestamo, esperada = null) => {
     if(!accion){
         return res.status(400).json({msg: `La solicitud esta ${prestamo.estado}`})
     }
-    const condicion = accion === 'devolucion' ? (req.body.condicion || 'bueno') : null
-    if(CONDICIONES_CON_EVIDENCIA.includes(condicion) && !req.file){
+    const condicion = req.body.condicion || 'bueno'
+    if(accion === 'devolucion' && CONDICIONES_CON_EVIDENCIA.includes(condicion) && !req.file){
         return res.status(400).json({msg: 'Adjunta una foto de evidencia del estado del recurso'})
     }
     // declarar una perdida no es una entrega fisica: no se valida el horario
-    if(horarioActivo() && condicion !== 'perdido' && !dentroDeHorario(new Date())){
+    if(horarioActivo() && !(accion === 'devolucion' && condicion === 'perdido') && !dentroDeHorario(new Date())){
         return res.status(400).json({msg: mensajeHorario()})
     }
     const recurso = await Recurso.findById(prestamo.recurso)
@@ -295,6 +295,7 @@ const registrarMovimiento = async (req, res, prestamo, esperada = null) => {
             responsable: admin._id,
             responsableNombre: responsable || `${admin.nombres} ${admin.apellidos}`,
             observaciones: typeof req.body.observaciones === 'string' ? req.body.observaciones.trim() : '',
+            condicion,
             ...(evidencia ? {evidencia} : {})
         }
 

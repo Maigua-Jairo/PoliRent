@@ -13,6 +13,12 @@ export const useConsultasStore = create(
           const anteriores = (state.porUsuario[clave] ?? []).filter((c) => c.texto !== texto)
           return { porUsuario: { ...state.porUsuario, [clave]: [{ texto, fecha: Date.now() }, ...anteriores].slice(0, MAXIMO) } }
         }),
+      borrarConsultas: (clave) =>
+        set((state) => {
+          const porUsuario = { ...state.porUsuario }
+          delete porUsuario[clave]
+          return { porUsuario }
+        }),
     }),
     { name: 'polirent-consultas' },
   ),

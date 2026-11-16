@@ -43,5 +43,7 @@ describe('Cobertura de la especificacion OpenAPI', () => {
         expect(especificacion.components.schemas.Notificacion.properties.tipo.enum).toContain('penalizacion')
         expect(especificacion.components.schemas.Recurso.properties.precio).toBeDefined()
         expect(Object.keys(especificacion.components.schemas.Prestamo.properties)).toEqual(expect.arrayContaining(['terminos', 'docenteReferencia', 'entrega', 'devolucion']))
+        expect(especificacion.components.schemas.Movimiento.properties.condicion.enum).toContain('bueno')
+        expect(especificacion.paths['/api/prestamos/{id}/entregar'].put.requestBody.content['application/json'].schema.properties.condicion).toBeDefined()
     })
 })

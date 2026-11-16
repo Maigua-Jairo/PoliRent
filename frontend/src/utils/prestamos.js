@@ -43,6 +43,13 @@ export const ESTADOS_ACTIVOS = ['pendiente', 'aprobado', 'entregado']
 // Mismas reglas que cancelarPrestamo en backend/src/controllers/prestamoController.js
 export const ESTADOS_CANCELABLES = ['pendiente', 'aprobado']
 export const puedeCancelar = (prestamo) => ESTADOS_CANCELABLES.includes(prestamo?.estado)
+// Mismo límite que solicitarPrestamo en backend/src/controllers/prestamoController.js
+export const mensajePrestamoActivo = (prestamo) => {
+  const recurso = prestamo?.recurso?.nombre ? ` (${prestamo.recurso.nombre})` : ''
+  return prestamo?.estado === 'pendiente'
+    ? `Ya tienes una solicitud en revisión${recurso}. Cancélala o espera la respuesta antes de solicitar otro recurso.`
+    : `Ya tienes un préstamo en curso${recurso}. Devuélvelo antes de solicitar otro recurso.`
+}
 // Aprobada (por retirar) o en préstamo (por devolver)
 export const enCurso = (prestamo) => ['aprobado', 'entregado'].includes(prestamo?.estado)
 
@@ -61,11 +68,10 @@ export const filtrarPorPestana = (prestamos, pestana) => {
   return estados ? prestamos.filter((p) => estados.includes(p.estado)) : prestamos
 }
 
-// Provisional: el backend aún no guarda dónde ni en qué horario se entrega el recurso
+// Ubicación y horario provisionales: el backend aún no expone estos datos.
 export const INFO_ENTREGA = {
   ubicacion: 'ESFOT - Laboratorio 2',
   horario: 'Lun - Vie: 07:00 - 16:00',
-  responsable: 'Directiva de la asociación estudiantil',
 }
 
 export const INSTRUCCIONES_RETIRO = [

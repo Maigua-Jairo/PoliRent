@@ -17,9 +17,45 @@ export const listarHistorialPrestamos = async ({ estado, desde, hasta } = {}, { 
   return data
 }
 
-/* HU-008: fechaDevolucion en ISO; motivo opcional (≤ 300) */
-export const solicitarPrestamo = async ({ recursoId, fechaDevolucion, motivo }) => {
-  const { data } = await axiosClient.post('/api/prestamos', { recursoId, fechaDevolucion, motivo })
+export const obtenerTerminosPrestamo = async ({ signal } = {}) => {
+  const { data } = await axiosClient.get('/api/terminos', { signal })
+  return data
+}
+
+/* HU-008: docente de referencia y aceptación de términos son obligatorios */
+export const solicitarPrestamo = async ({ recursoId, fechaDevolucion, motivo, aceptaTerminos, docenteReferencia }) => {
+  const { data } = await axiosClient.post('/api/prestamos', {
+    recursoId,
+    fechaDevolucion,
+    motivo,
+    aceptaTerminos,
+    docenteReferencia,
+  })
+  return data
+}
+
+/* El multipart explícito evita que axios serialice la evidencia como JSON */
+export const registrarEntrega = async (id, { responsable, observaciones, condicion, evidencia }) => {
+  const datos = new FormData()
+  if (responsable) datos.append('responsable', responsable)
+  if (observaciones) datos.append('observaciones', observaciones)
+  if (condicion) datos.append('condicion', condicion)
+  if (evidencia) datos.append('evidencia', evidencia)
+  const { data } = await axiosClient.put(`/api/prestamos/${id}/entregar`, datos, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export const registrarDevolucion = async (id, { responsable, observaciones, condicion, evidencia }) => {
+  const datos = new FormData()
+  if (responsable) datos.append('responsable', responsable)
+  if (observaciones) datos.append('observaciones', observaciones)
+  if (condicion) datos.append('condicion', condicion)
+  if (evidencia) datos.append('evidencia', evidencia)
+  const { data } = await axiosClient.put(`/api/prestamos/${id}/devolver`, datos, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }
 
