@@ -6,7 +6,7 @@
 // Si hay GEMINI_API_KEY, geminiHelper redacta la respuesta con esta misma base de conocimiento
 // y este motor queda como respaldo.
 
-import {tarifas, horario} from './politicasHelper.js'
+import {tarifas, horario, DIAS_MAX_PRESTAMO} from './politicasHelper.js'
 
 const TIPOS_RESPUESTA = ['ayuda', 'recomendacion', 'fuera_de_tema']
 
@@ -94,27 +94,34 @@ const PREGUNTAS_FRECUENTES = [
         claves: ['reserv', 'solicit', 'pedir', 'pido', 'prest', 'alquil', 'rent', 'apart'],
         // verbos muy generales: en un empate gana la pregunta mas especifica (p. ej. "cancelo mi solicitud")
         peso: 0.9,
-        respuesta: 'Inicia sesión con tu cuenta de estudiante, busca el recurso en la sección Recursos y abre su ficha. '
-            + 'Si está disponible, elige la fecha de devolución (máximo 30 días), escribe opcionalmente el motivo, indica un docente de referencia '
-            + '(nombre y correo), acepta los términos y condiciones y envía la solicitud. '
-            + 'Quedará "En revisión" hasta que la asociación la apruebe o la rechace.',
+        get respuesta() {
+            return 'Inicia sesión con tu cuenta de estudiante, busca el recurso en la sección Recursos y abre su ficha. '
+                + `Si está disponible, elige la fecha de devolución (máximo ${DIAS_MAX_PRESTAMO} días), escribe opcionalmente el motivo, indica un docente de referencia `
+                + '(nombre y correo), acepta los términos y condiciones y envía la solicitud. '
+                + 'Quedará "En revisión" hasta que la asociación la apruebe o la rechace.'
+        },
         enlaces: [{texto: 'Ver recursos', ruta: '/#recursos'}]
     },
     {
         id: 'plazo',
         titulo: '¿Por cuánto tiempo me prestan un recurso?',
-        claves: ['cuant dia', 'cuanto tiempo', 'plazo', 'fecha devoluc', 'maxim', 'durac', 'hasta cuand'],
-        respuesta: 'Al reservar eliges la fecha de devolución: debe ser posterior a hoy y como máximo 30 días después. '
-            + 'Devuelve el recurso a tiempo para que otros estudiantes también puedan usarlo.',
+        claves: ['cuant dia', 'cuanto tiempo', 'plazo', 'fecha devoluc', 'maxim', 'durac', 'hasta cuand', 'quedarm', 'quedar con'],
+        get respuesta() {
+            const {fin} = horario()
+            return `Al reservar eliges la fecha de devolución: debe ser posterior a hoy y como máximo ${DIAS_MAX_PRESTAMO} días calendario después `
+                + `(si eliges solo el día, la devolución vence a las ${fin} de ese día). `
+                + `Devuelve el recurso a tiempo: cada día de atraso genera una penalización del ${tarifas().atrasoPorDia} % de su precio.`
+        },
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
         id: 'prestamo_unico',
         titulo: '¿Puedo pedir varios recursos a la vez?',
-        claves: ['otro recurs', 'mas de un', 'varios', 'dos recurs', 'a la vez', 'al mismo tiempo', 'no pued solicit', 'no pued reserv', 'no me dej'],
-        respuesta: 'Solo puedes tener un préstamo a la vez. Mientras tengas una solicitud en revisión, aprobada o un recurso en préstamo, '
+        claves: ['otro recurs', 'mas de un', 'varios', 'dos recurs', 'a la vez', 'al mismo tiempo', 'no pued solicit', 'no pued reserv', 'no me dej', 'por que solo', 'solo un prest'],
+        respuesta: 'Solo puedes tener un préstamo a la vez, para que los recursos de la asociación alcancen para todos los estudiantes. '
+            + 'Mientras tengas una solicitud en revisión, aprobada o un recurso en préstamo, '
             + 'no puedes solicitar otro: cancela la solicitud o devuelve el recurso y luego podrás reservar uno nuevo. '
-            + 'Tampoco puedes solicitar recursos mientras tengas penalizaciones pendientes.',
+            + 'Tampoco puedes solicitar recursos mientras tengas penalizaciones pendientes o en revisión.',
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
@@ -128,7 +135,7 @@ const PREGUNTAS_FRECUENTES = [
     {
         id: 'estado_solicitud',
         titulo: '¿Cómo veo el estado de mis solicitudes?',
-        claves: ['mis solicitud', 'estado', 'seguimient', 'aprob', 'rechaz', 'historial', 'notific', 'respuest'],
+        claves: ['mis solicitud', 'estado', 'seguimient', 'aprob', 'rechaz', 'respuest'],
         respuesta: 'En "Mis solicitudes" ves cada solicitud con su estado: En revisión, Aprobada, En préstamo, Devuelta, Rechazada o Cancelada. '
             + 'Cuando la asociación aprueba o rechaza tu solicitud recibes una notificación (la campana de la barra superior).',
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
@@ -168,6 +175,55 @@ const PREGUNTAS_FRECUENTES = [
                 + `Se acumulan hasta un máximo del ${t.tope} % del precio por préstamo. Mientras tengas penalizaciones pendientes no podrás solicitar otro recurso; `
                 + 'las aceptas en los términos y condiciones al reservar.'
         },
+        enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    },
+    {
+        id: 'historial_notificaciones',
+        titulo: '¿Dónde veo mi historial y mis notificaciones?',
+        claves: ['historial', 'notific', 'aviso', 'campana', 'prestamos anterior', 'solicitudes anterior', 'mis prestamo'],
+        respuesta: 'En "Mis solicitudes" está tu historial completo: cada solicitud con su estado y sus fechas, y puedes filtrar por estado o por fechas. '
+            + 'Las notificaciones (aprobaciones, rechazos, recordatorios y vencimientos de devolución y penalizaciones) aparecen en la campana de la barra superior '
+            + 'y, si la asociación configuró el correo, también llegan a tu correo institucional.',
+        enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}, {texto: 'Notificaciones', ruta: '/perfil?seccion=notificaciones'}]
+    },
+    {
+        id: 'pagar_penalizacion',
+        titulo: '¿Cómo pago una penalización y subo el comprobante?',
+        claves: ['comprobant', 'pag penaliz', 'pag multa', 'pag sancion', 'como pag', 'donde pag', 'transferenc', 'deposit', 'penaliz en revision', 'rechaz comprobant', 'subi comprobant'],
+        respuesta: 'Paga el monto a la asociación estudiantil (por transferencia, depósito o en efectivo). Si pagaste por transferencia o depósito, entra a "Mis penalizaciones" '
+            + 'y sube la foto del comprobante (JPG, PNG o WEBP de hasta 2 MB) con el número de referencia. La penalización pasa de "Pendiente" a "En revisión" '
+            + 'y, cuando el administrador verifica el comprobante, queda "Pagada". Si lo rechaza, vuelve a "Pendiente" con el motivo y puedes subir otro. '
+            + 'Mientras esté pendiente o en revisión sigue contando como deuda y no puedes solicitar otro recurso.',
+        enlaces: [{texto: 'Mis penalizaciones', ruta: '/penalizaciones'}]
+    },
+    {
+        id: 'perdida_dano',
+        titulo: '¿Qué hago si pierdo o daño un recurso?',
+        // mas especifica que "penalizaciones": pide la palabra "recurso" junto a perder/danar/romper
+        claves: ['pierd recurs', 'perdi recurs', 'dan recurs', 'danad recurs', 'romp recurs', 'rompi recurs', 'que hag si pierd', 'que hag si romp', 'repon', 'robaron', 'extravi'],
+        get respuesta() {
+            const t = tarifas()
+            return 'Avisa cuanto antes a la asociación. Al recibirlo, el responsable registra la condición (dañado, incompleto o perdido) con una foto de evidencia '
+                + `y el recurso queda en mantenimiento. Se genera una penalización del ${t.danio} % del precio si está dañado o incompleto, o del ${t.perdida} % si lo pierdes `
+                + '(sin sumar atraso). Si repones el artículo completo, la asociación puede anular la penalización; si no, págala y sube el comprobante en "Mis penalizaciones".'
+        },
+        enlaces: [{texto: 'Mis penalizaciones', ruta: '/penalizaciones'}]
+    },
+    {
+        id: 'docente_referencia',
+        titulo: '¿Para qué sirve el docente de referencia?',
+        claves: ['docent', 'profesor', 'referencia'],
+        respuesta: 'Al solicitar un recurso indicas un docente de referencia (nombre y correo; el teléfono es opcional). Solo lo ve la asociación '
+            + 'y únicamente lo contacta si no devuelves el recurso: no se le envía ningún correo al reservar. Elige un docente que te conozca, por ejemplo el de la materia del proyecto.',
+        enlaces: [{texto: 'Ver recursos', ruta: '/#recursos'}]
+    },
+    {
+        id: 'evidencia',
+        titulo: '¿Para qué sirve la foto de evidencia en la entrega y la devolución?',
+        claves: ['evidenci', 'evidenci entreg', 'evidenci devoluc', 'sirv evidenci', 'foto entreg', 'foto devoluc', 'foto devolv', 'para que la foto', 'por que la foto', 'por que me tom foto'],
+        respuesta: 'Al entregarte y al recibir el recurso, el responsable puede tomar una foto de evidencia de su estado. Es un respaldo para ti y para la asociación: '
+            + 'muestra cómo salió y cómo volvió el recurso. Si se devuelve dañado o incompleto la foto es obligatoria y respalda la penalización. '
+            + 'Revisa el recurso cuando te lo entreguen y avisa si ya tiene algún daño.',
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
@@ -302,7 +358,8 @@ const dolares = (monto) => `$${(Number(monto) || 0).toFixed(2)}`
 /**
  * Respuesta a "¿cuánto debo?".
  * @param {string} mensaje
- * @param {{totalAdeudado, totalAtrasoEnCurso} | null} resumen  null si no hay sesion de estudiante
+ * @param {{totalAdeudado, totalEnRevision, totalAtrasoEnCurso} | null} resumen  null si no hay sesion de estudiante
+ *        (totalAdeudado incluye lo que esta en revision)
  * @returns {{tipo, respuesta, enlaces, recomendaciones, preguntaFrecuente, seguro} | null}  null si el mensaje no pregunta por la deuda
  */
 const responderDeuda = (mensaje, resumen) => {
@@ -313,12 +370,19 @@ const responderDeuda = (mensaje, resumen) => {
             + 'Las penalizaciones se generan por atraso, daño o pérdida de un recurso.', [{texto: 'Iniciar sesión', ruta: '/login'}])
     }
     const deuda = Number(resumen.totalAdeudado) || 0
+    const enRevision = Math.min(Number(resumen.totalEnRevision) || 0, deuda)
+    const pendiente = Math.round((deuda - enRevision) * 100) / 100
     const atraso = Number(resumen.totalAtrasoEnCurso) || 0
-    const enlaces = [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
-    if (deuda > 0) {
-        return respuesta(`Tienes ${dolares(deuda)} en penalizaciones pendientes`
-            + (atraso > 0 ? `; además, tu atraso actual acumula ${dolares(atraso)}` : '')
-            + '. Regularízalas con la asociación: mientras tengas penalizaciones pendientes no podrás solicitar otro recurso.', enlaces)
+    const enlaces = [{texto: 'Mis penalizaciones', ruta: '/penalizaciones'}, {texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    const notaAtraso = atraso > 0 ? `; además, tu atraso actual acumula ${dolares(atraso)}` : ''
+    const notaRevision = `Tienes ${dolares(enRevision)} en revisión: el administrador está verificando tu comprobante`
+    if (pendiente > 0) {
+        return respuesta(`Tienes ${dolares(pendiente)} en penalizaciones pendientes${notaAtraso}. `
+            + (enRevision > 0 ? `${notaRevision}. ` : '')
+            + 'Regularízalas con la asociación o sube el comprobante de pago en "Mis penalizaciones": mientras tengas penalizaciones pendientes no podrás solicitar otro recurso.', enlaces)
+    }
+    if (enRevision > 0) {
+        return respuesta(`${notaRevision}${notaAtraso}. Podrás solicitar otro recurso cuando confirme el pago.`, enlaces)
     }
     return respuesta('No tienes penalizaciones pendientes'
         + (atraso > 0 ? `, pero tu atraso actual acumula ${dolares(atraso)}: devuelve el recurso cuanto antes para que no siga aumentando.` : '.'), enlaces)

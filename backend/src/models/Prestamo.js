@@ -74,7 +74,10 @@ const PrestamoSchema = new Schema({
         evidencia: {url: String, publicId: String}
     }
 },{
-    timestamps: true
+    timestamps: true,
+    // save() falla con VersionError si otra peticion cambio la solicitud al mismo tiempo
+    // (dos aprobaciones, aprobar y cancelar, dos devoluciones...): evita aplicar dos veces la misma transicion
+    optimisticConcurrency: true
 })
 
 // un estudiante solo puede tener un prestamo en uno de estos estados a la vez

@@ -78,7 +78,10 @@ export default {
             '2. Pulsa el boton **Authorize**, pega el token (sin la palabra Bearer) y confirma.',
             '3. Ya puedes probar las rutas con candado. Las rutas de administrador requieren un usuario con rol `administrador`.',
             '',
-            '**Convenciones:** los errores responden `{ "msg": "..." }`. Un `401` significa que la sesion no es valida; los errores de datos usan `400`.'
+            '**Convenciones:** los errores responden `{ "msg": "..." }`. Un `401` significa que la sesion no es valida; los errores de datos usan `400`.',
+            'Un cuerpo JSON de mas de 100 KB, un JSON o un `multipart/form-data` mal formados responden `400`. En multipart se acepta un solo archivo (JPG, PNG o WEBP, maximo 2 MB) en el campo indicado por cada ruta.',
+            'Si la base de datos no responde al verificar la sesion se devuelve `500` (no `401`), para que el cliente no cierre la sesion por un fallo del servidor.',
+            'Las acciones que cambian el estado de una solicitud o de una penalizacion devuelven `400` si otra peticion la modifico al mismo tiempo.'
         ].join('\n')
     },
     servers: [{url: '/', description: 'Servidor actual'}],
@@ -162,6 +165,14 @@ export default {
                     estado: {type: 'string', enum: ESTADOS_PENALIZACION},
                     fechaPago: {type: 'string', format: 'date-time', nullable: true},
                     motivoAnulacion: {type: 'string', example: 'El estudiante repuso el articulo'},
+                    comprobante: {type: 'object', nullable: true, description: 'Comprobante de pago subido por el estudiante (sin el publicId de Cloudinary). Se conserva al pagar y se borra al rechazarlo', properties: {
+                        url: {type: 'string', example: 'https://res.cloudinary.com/.../comprobante.jpg'},
+                        subidoEn: {type: 'string', format: 'date-time'},
+                        referencia: {type: 'string', maxLength: 50, example: 'TRX-004512'},
+                        observaciones: {type: 'string', maxLength: 200, example: 'Deposito en Banco Pichincha'}
+                    }},
+                    motivoRechazoComprobante: {type: 'string', description: 'Motivo del ultimo comprobante rechazado (vacio si no hay)', example: 'La foto no se lee'},
+                    fechaRevision: {type: 'string', format: 'date-time', nullable: true, description: 'Cuando el administrador aprobo (pago) o rechazo el comprobante'},
                     usuario: {description: 'Id del estudiante, o sus datos cuando lo consulta el administrador', oneOf: [ID_SCHEMA, ref('Usuario')]},
                     recurso: {description: 'Id o datos basicos del recurso', oneOf: [ID_SCHEMA, ref('Recurso')]},
                     prestamo: {description: 'Id o datos basicos del prestamo', oneOf: [ID_SCHEMA, {type: 'object'}]},
@@ -373,16 +384,16 @@ export default {
                             categoria: {type: 'string', enum: CATEGORIAS},
                             etiquetas: {type: 'array', maxItems: 10, items: {type: 'string', minLength: 2, maxLength: 30}, example: ['sensores', 'distancia', 'robotica']},
                             estado: {type: 'string', enum: ESTADOS, default: 'disponible'},
-                            imagen: {type: 'string', description: 'URL de una imagen ya publicada (alternativa a subir archivo)'},
+                            imagen: {type: 'string', maxLength: 500, pattern: '^https?://', description: 'URL http(s) de una imagen ya publicada (alternativa a subir archivo)', example: 'https://res.cloudinary.com/.../recurso.jpg'},
                             precio: {type: 'number', minimum: 0, maximum: 100000, description: 'Precio de reposicion en dolares (base de las penalizaciones)', example: 45}
                         }
                     }},
                     'multipart/form-data': {schema: {
                         type: 'object', required: ['nombre', 'categoria'],
                         properties: {
-                            nombre: {type: 'string'}, descripcion: {type: 'string'},
+                            nombre: {type: 'string', minLength: 3, maxLength: 100}, descripcion: {type: 'string', maxLength: 500},
                             categoria: {type: 'string', enum: CATEGORIAS},
-                            etiquetas: {type: 'string', description: 'Separadas por comas', example: 'robotica,arduino'},
+                            etiquetas: {type: 'string', description: 'Separadas por comas: maximo 10, de 2 a 30 caracteres cada una', example: 'robotica,arduino'},
                             estado: {type: 'string', enum: ESTADOS},
                             precio: {type: 'string', description: 'Numero entre 0 y 100000', example: '45'},
                             imagen: {type: 'string', format: 'binary'}
@@ -411,17 +422,18 @@ export default {
                     'application/json': {schema: {
                         type: 'object',
                         properties: {
-                            nombre: {type: 'string'}, descripcion: {type: 'string'}, categoria: {type: 'string', enum: CATEGORIAS},
-                            etiquetas: {type: 'array', items: {type: 'string'}, example: ['arduino', 'robotica']},
-                            estado: {type: 'string', enum: ESTADOS}, imagen: {type: 'string'},
+                            nombre: {type: 'string', minLength: 3, maxLength: 100}, descripcion: {type: 'string', maxLength: 500}, categoria: {type: 'string', enum: CATEGORIAS},
+                            etiquetas: {type: 'array', maxItems: 10, items: {type: 'string', minLength: 2, maxLength: 30}, example: ['arduino', 'robotica']},
+                            estado: {type: 'string', enum: ESTADOS},
+                            imagen: {type: 'string', maxLength: 500, description: 'URL http(s) de una imagen, o texto vacio para quitar la imagen actual'},
                             precio: {type: 'number', minimum: 0, maximum: 100000, example: 45}
                         }
                     }},
                     'multipart/form-data': {schema: {
                         type: 'object',
                         properties: {
-                            nombre: {type: 'string'}, descripcion: {type: 'string'}, categoria: {type: 'string', enum: CATEGORIAS},
-                            etiquetas: {type: 'string', example: 'arduino,robotica'}, estado: {type: 'string', enum: ESTADOS},
+                            nombre: {type: 'string', minLength: 3, maxLength: 100}, descripcion: {type: 'string', maxLength: 500}, categoria: {type: 'string', enum: CATEGORIAS},
+                            etiquetas: {type: 'string', description: 'Separadas por comas: maximo 10, de 2 a 30 caracteres cada una', example: 'arduino,robotica'}, estado: {type: 'string', enum: ESTADOS},
                             precio: {type: 'string', example: '45'},
                             imagen: {type: 'string', format: 'binary'}
                         }
@@ -479,7 +491,7 @@ export default {
                 description: [
                     'Un solo chat que atiende dos temas y rechaza el resto:',
                     '',
-                    '- **ayuda**: dudas sobre el uso de PoliRent (registro, inicio y cierre de sesion, contraseña, reservas, plazo, prestamo unico, cancelar, retiro y devolucion, horario, penalizaciones...). Trae `enlaces` a las pantallas del frontend. A un estudiante que pregunta \"¿cuanto debo?\" le responde con sus penalizaciones pendientes y su atraso en curso (sin consultar a Gemini).',
+                    '- **ayuda**: dudas sobre el uso de PoliRent (registro, inicio y cierre de sesion, contraseña, reservas, plazo, prestamo unico, cancelar, retiro y devolucion, horario, penalizaciones, pago y comprobante, perdida o dano, docente de referencia, evidencia, historial y notificaciones...). Trae `enlaces` a las pantallas del frontend. A un estudiante que pregunta \"¿cuanto debo?\" le responde con sus penalizaciones pendientes y su atraso en curso (sin consultar a Gemini).',
                     '- **recomendacion**: el usuario describe su proyecto o actividad y recibe recursos **disponibles** del catalogo en `recomendaciones` (mismo formato que `POST /api/recomendaciones`).',
                     '- **fuera_de_tema**: cualquier otra pregunta; responde que solo ayuda con PoliRent y recursos.',
                     '',
@@ -710,6 +722,7 @@ export default {
                             }}},
                             penalizaciones: {type: 'object', properties: {
                                 pendientes: {type: 'object', properties: {cantidad: {type: 'integer'}, monto: {type: 'number'}}},
+                                enRevision: {type: 'object', description: 'Con comprobante subido, a la espera de revision', properties: {cantidad: {type: 'integer'}, monto: {type: 'number'}}},
                                 pagadas: {type: 'object', properties: {cantidad: {type: 'integer'}, monto: {type: 'number'}}},
                                 anuladas: {type: 'object', properties: {cantidad: {type: 'integer'}}},
                                 montoPorTipo: {type: 'object', description: 'Monto no anulado por tipo', properties: {atraso: {type: 'number'}, danio: {type: 'number'}, perdida: {type: 'number'}}}
@@ -770,7 +783,7 @@ export default {
         '/api/reportes/penalizaciones': {
             get: {
                 tags: ['Metricas y reportes (HU-004)'], summary: 'Reporte de penalizaciones (administrador)', operationId: 'reportePenalizaciones', security: conToken,
-                description: 'Una fila por penalizacion: estudiante, cedula, correo, recurso, tipo, monto, dias, estado, fecha de registro, fecha de pago y motivo de anulacion. Con `formato=csv` se descarga.',
+                description: 'Una fila por penalizacion: estudiante, cedula, correo, recurso, tipo, monto, dias, estado, fecha de registro, fecha de pago, motivo de anulacion, URL del comprobante, referencia y fecha de revision. Con `formato=csv` se descarga.',
                 parameters: [
                     ...filtrosFechas,
                     query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION}),
@@ -784,7 +797,7 @@ export default {
                         }}},
                         'text/csv': {schema: {type: 'string'}}
                     }},
-                    400: error('Filtro invalido', 'El estado debe ser: pendiente, pagada, anulada'), 401: r401, 403: r403
+                    400: error('Filtro invalido', 'El estado debe ser: pendiente, en_revision, pagada, anulada'), 401: r401, 403: r403
                 }
             }
         },
@@ -800,12 +813,13 @@ export default {
         '/api/penalizaciones/mis': {
             get: {
                 tags: ['Penalizaciones'], summary: 'Ver mis penalizaciones (estudiante)', operationId: 'misPenalizaciones', security: conToken,
-                description: '`totalAdeudado` suma las pendientes (bloquean nuevas solicitudes). `atrasoEnCurso` lista los prestamos entregados con la fecha vencida y lo que acumulan hasta ahora; se calcula al vuelo y se cobra al registrar la devolucion.',
+                description: '`totalAdeudado` suma las `pendiente` y las `en_revision` (siguen siendo deuda y bloquean nuevas solicitudes hasta que el administrador confirme el pago); `totalEnRevision` es la parte con comprobante enviado. `atrasoEnCurso` lista los prestamos entregados con la fecha vencida y lo que acumulan hasta ahora; se calcula al vuelo y se cobra al registrar la devolucion. Cada penalizacion trae su `comprobante` y `motivoRechazoComprobante`.',
                 parameters: [query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION})],
                 responses: {
                     200: ok('Mis penalizaciones', {type: 'object', properties: {
                         total: {type: 'integer'},
-                        totalAdeudado: {type: 'number', example: 9},
+                        totalAdeudado: {type: 'number', description: 'Pendientes + en revision', example: 9},
+                        totalEnRevision: {type: 'number', example: 0},
                         totalAtrasoEnCurso: {type: 'number', example: 4.5},
                         atrasoEnCurso: {type: 'array', items: {type: 'object', properties: {
                             prestamo: ID_SCHEMA, recurso: {type: 'object', properties: {_id: ID_SCHEMA, nombre: {type: 'string'}}},
@@ -813,14 +827,43 @@ export default {
                         }}},
                         penalizaciones: {type: 'array', items: ref('Penalizacion')}
                     }}),
-                    400: error('Filtro invalido', 'El estado debe ser: pendiente, pagada, anulada'), 401: r401, 403: r403
+                    400: error('Filtro invalido', 'El estado debe ser: pendiente, en_revision, pagada, anulada'), 401: r401, 403: r403
+                }
+            }
+        },
+        '/api/penalizaciones/{id}/comprobante': {
+            put: {
+                tags: ['Penalizaciones'], summary: 'Enviar el comprobante de pago (estudiante)', operationId: 'enviarComprobante', security: conToken,
+                description: [
+                    'El estudiante sube la foto del comprobante de pago de **su** penalizacion en `multipart/form-data` (campo `comprobante`, JPG, PNG o WEBP, maximo 2 MB).',
+                    '',
+                    '- Solo desde `pendiente` o `en_revision`. La penalizacion pasa a `en_revision` y sigue contando como deuda hasta que el administrador la marque como pagada.',
+                    '- En `en_revision` el comprobante nuevo reemplaza al anterior (la imagen anterior se borra de Cloudinary).',
+                    '- Se notifica a todos los administradores. Si el administrador rechaza el comprobante, la penalizacion vuelve a `pendiente` con `motivoRechazoComprobante` y se puede enviar otro.',
+                    '- Una penalizacion inexistente o de otro estudiante responde 404 con el mismo mensaje.'
+                ].join('\n'),
+                parameters: [idRuta('Id de la penalizacion')],
+                requestBody: {required: true, content: {'multipart/form-data': {schema: {
+                    type: 'object', required: ['comprobante'],
+                    properties: {
+                        comprobante: {type: 'string', format: 'binary', description: 'Foto del comprobante (JPG, PNG o WEBP, maximo 2 MB)'},
+                        referencia: {type: 'string', minLength: 3, maxLength: 50, description: 'Opcional: numero de la transferencia o del deposito', example: 'TRX-004512'},
+                        observaciones: {type: 'string', maxLength: 200, description: 'Opcional', example: 'Deposito en Banco Pichincha'}
+                    }
+                }}}},
+                responses: {
+                    200: ok('Comprobante enviado', {type: 'object', properties: {msg: {type: 'string', example: 'Comprobante enviado, el administrador lo revisara'}, penalizacion: ref('Penalizacion')}}),
+                    400: error('Id o datos invalidos, falta el archivo, archivo que no es imagen o mayor a 2 MB, o la penalizacion no esta pendiente ni en revision', 'Adjunta el comprobante de pago'),
+                    401: r401, 403: r403,
+                    404: error('No existe o no es tuya', 'Penalizacion no encontrada'),
+                    503: error('Cloudinary no configurado', 'La subida de imagenes no esta disponible: falta configurar Cloudinary')
                 }
             }
         },
         '/api/penalizaciones': {
             get: {
                 tags: ['Penalizaciones'], summary: 'Listar penalizaciones (administrador)', operationId: 'listarPenalizaciones', security: conToken,
-                description: 'Con los datos del estudiante (nombres, apellidos, cedula, correo), del recurso y del prestamo (incluido el docente de referencia).',
+                description: 'Con los datos del estudiante (nombres, apellidos, cedula, correo), del recurso y del prestamo (incluido el docente de referencia). `?estado=en_revision` devuelve la cola de comprobantes por revisar; cada penalizacion trae `comprobante.url`.',
                 parameters: [
                     query('estado', 'Filtra por estado', {type: 'string', enum: ESTADOS_PENALIZACION}, 'pendiente'),
                     query('usuario', 'Id del estudiante', ID_SCHEMA),
@@ -828,19 +871,35 @@ export default {
                     query('hasta', 'Fecha final (AAAA-MM-DD), incluye todo ese dia', {type: 'string', format: 'date'}, '2026-10-31')
                 ],
                 responses: {
-                    200: ok('Penalizaciones', {type: 'object', properties: {total: {type: 'integer'}, totalPendiente: {type: 'number'}, penalizaciones: {type: 'array', items: ref('Penalizacion')}}}),
+                    200: ok('Penalizaciones', {type: 'object', properties: {
+                        total: {type: 'integer'}, totalPendiente: {type: 'number', description: 'Suma de las pendientes del listado'},
+                        totalEnRevision: {type: 'number', description: 'Suma de las en revision del listado'}, penalizaciones: {type: 'array', items: ref('Penalizacion')}
+                    }}),
                     400: error('Filtro invalido', 'El id del usuario no es valido'), 401: r401, 403: r403
                 }
             }
         },
         '/api/penalizaciones/{id}/pagar': {
             put: {
-                tags: ['Penalizaciones'], summary: 'Registrar el pago de una penalizacion (administrador)', operationId: 'pagarPenalizacion', security: conToken,
-                description: 'Solo sobre penalizaciones `pendiente`. Guarda `fechaPago` y notifica al estudiante.',
+                tags: ['Penalizaciones'], summary: 'Aceptar el comprobante o registrar el pago (administrador)', operationId: 'pagarPenalizacion', security: conToken,
+                description: '**Es la ruta para aceptar el comprobante de pago.** Desde `en_revision` (el administrador reviso el comprobante y es correcto) o desde `pendiente` (pago en efectivo sin comprobante). Guarda `fechaPago` y la revision, conserva el comprobante como respaldo y notifica al estudiante.',
                 parameters: [idRuta('Id de la penalizacion')],
                 responses: {
                     200: ok('Pago registrado', {type: 'object', properties: {msg: {type: 'string'}, penalizacion: ref('Penalizacion')}}),
-                    400: error('Id invalido o la penalizacion no esta pendiente', 'Solo se pueden modificar penalizaciones pendientes'),
+                    400: error('Id invalido o la penalizacion no esta pendiente ni en revision', 'Solo se pueden pagar penalizaciones pendientes o en revision'),
+                    401: r401, 403: r403, 404: error('No existe', 'Penalizacion no encontrada')
+                }
+            }
+        },
+        '/api/penalizaciones/{id}/rechazar-comprobante': {
+            put: {
+                tags: ['Penalizaciones'], summary: 'Rechazar el comprobante de pago (administrador)', operationId: 'rechazarComprobante', security: conToken,
+                description: 'Solo desde `en_revision`. La penalizacion vuelve a `pendiente`, se guarda `motivoRechazoComprobante`, se borra la imagen de Cloudinary y se notifica al estudiante con el motivo (puede enviar otro comprobante).',
+                parameters: [idRuta('Id de la penalizacion')],
+                requestBody: {required: true, content: json({type: 'object', required: ['motivo'], properties: {motivo: {type: 'string', minLength: 3, maxLength: 200, example: 'La foto no se lee'}}})},
+                responses: {
+                    200: ok('Comprobante rechazado', {type: 'object', properties: {msg: {type: 'string'}, penalizacion: ref('Penalizacion')}}),
+                    400: error('Sin motivo, id invalido o la penalizacion no esta en revision', 'Solo se puede rechazar el comprobante de una penalizacion en revision'),
                     401: r401, 403: r403, 404: error('No existe', 'Penalizacion no encontrada')
                 }
             }
@@ -848,12 +907,12 @@ export default {
         '/api/penalizaciones/{id}/anular': {
             put: {
                 tags: ['Penalizaciones'], summary: 'Anular una penalizacion (administrador)', operationId: 'anularPenalizacion', security: conToken,
-                description: 'Solo sobre penalizaciones `pendiente`, por ejemplo cuando el estudiante repone el articulo perdido. Notifica al estudiante.',
+                description: 'Solo sobre penalizaciones `pendiente` o `en_revision`, por ejemplo cuando el estudiante repone el articulo perdido. Notifica al estudiante.',
                 parameters: [idRuta('Id de la penalizacion')],
                 requestBody: {required: true, content: json({type: 'object', required: ['motivo'], properties: {motivo: {type: 'string', minLength: 3, maxLength: 200, example: 'El estudiante repuso el articulo'}}})},
                 responses: {
                     200: ok('Penalizacion anulada', {type: 'object', properties: {msg: {type: 'string'}, penalizacion: ref('Penalizacion')}}),
-                    400: error('Sin motivo, id invalido o la penalizacion no esta pendiente', 'El motivo de la anulacion debe tener entre 3 y 200 caracteres'),
+                    400: error('Sin motivo, id invalido o la penalizacion no esta pendiente ni en revision', 'El motivo de la anulacion debe tener entre 3 y 200 caracteres'),
                     401: r401, 403: r403, 404: error('No existe', 'Penalizacion no encontrada')
                 }
             }

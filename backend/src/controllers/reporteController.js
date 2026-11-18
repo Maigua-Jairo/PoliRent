@@ -215,13 +215,17 @@ const reportePenalizaciones = async (req, res) => {
             estado: p.estado,
             registradaEl: p.createdAt,
             fechaPago: p.fechaPago,
-            motivoAnulacion: p.motivoAnulacion ?? ''
+            motivoAnulacion: p.motivoAnulacion ?? '',
+            comprobante: p.comprobante?.url ?? '',
+            referencia: p.comprobante?.referencia ?? '',
+            fechaRevision: p.fechaRevision
         }))
         const columnas = [
             {titulo: 'Estudiante', campo: 'estudiante'}, {titulo: 'Cedula', campo: 'cedula'}, {titulo: 'Correo', campo: 'correo'},
             {titulo: 'Recurso', campo: 'recurso'}, {titulo: 'Tipo', campo: 'tipo'}, {titulo: 'Monto', campo: 'monto'},
             {titulo: 'Dias', campo: 'dias'}, {titulo: 'Estado', campo: 'estado'}, {titulo: 'Registrada el', campo: 'registradaEl'},
-            {titulo: 'Fecha de pago', campo: 'fechaPago'}, {titulo: 'Motivo de anulacion', campo: 'motivoAnulacion'}
+            {titulo: 'Fecha de pago', campo: 'fechaPago'}, {titulo: 'Motivo de anulacion', campo: 'motivoAnulacion'},
+            {titulo: 'Comprobante (URL)', campo: 'comprobante'}, {titulo: 'Referencia', campo: 'referencia'}, {titulo: 'Revisada el', campo: 'fechaRevision'}
         ]
         responderReporte(res, formato, 'reporte-penalizaciones', columnas, filas, {
             desde: desde ?? null, hasta: hasta ?? null, estado: estado ?? null, total: filas.length,

@@ -82,6 +82,8 @@ const resumenPenalizaciones = (penalizaciones) => {
     const vigentes = penalizaciones.filter(p => p.estado !== 'anulada')
     return {
         pendientes: {cantidad: deEstado('pendiente').length, monto: monto(deEstado('pendiente'))},
+        // comprobante subido, a la espera de que el administrador lo revise
+        enRevision: {cantidad: deEstado('en_revision').length, monto: monto(deEstado('en_revision'))},
         pagadas: {cantidad: deEstado('pagada').length, monto: monto(deEstado('pagada'))},
         anuladas: {cantidad: deEstado('anulada').length},
         montoPorTipo: {

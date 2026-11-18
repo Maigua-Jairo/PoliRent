@@ -99,7 +99,7 @@ describe('POST /api/prestamos (solicitud)', () => {
         const res = await solicitar(valida())
         expect(res.status).toBe(400)
         expect(res.body.msg).toBe('Tienes penalizaciones pendientes por $12.50. Regularizalas con la asociacion antes de solicitar otro recurso')
-        expect(Penalizacion.find).toHaveBeenCalledWith({usuario: ESTUDIANTE._id, estado: 'pendiente'})
+        expect(Penalizacion.find).toHaveBeenCalledWith({usuario: ESTUDIANTE._id, estado: {$in: ['pendiente', 'en_revision']}})
         expect(Prestamo.create).not.toHaveBeenCalled()
     })
 

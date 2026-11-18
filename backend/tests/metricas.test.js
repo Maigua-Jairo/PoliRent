@@ -88,13 +88,15 @@ describe('Resumen de penalizaciones', () => {
             {tipo: 'atraso', estado: 'pendiente', monto: 5},
             {tipo: 'danio', estado: 'pagada', monto: 20},
             {tipo: 'perdida', estado: 'anulada', monto: 100},
-            {tipo: 'atraso', estado: 'pagada', monto: 2.5}
+            {tipo: 'atraso', estado: 'pagada', monto: 2.5},
+            {tipo: 'danio', estado: 'en_revision', monto: 8}
         ])
         expect(r).toEqual({
             pendientes: {cantidad: 1, monto: 5},
+            enRevision: {cantidad: 1, monto: 8},
             pagadas: {cantidad: 2, monto: 22.5},
             anuladas: {cantidad: 1},
-            montoPorTipo: {atraso: 7.5, danio: 20, perdida: 0}
+            montoPorTipo: {atraso: 7.5, danio: 28, perdida: 0}
         })
     })
 })
@@ -125,7 +127,7 @@ describe('Endpoints de metricas y reportes', () => {
         expect(res.status).toBe(200)
         expect(res.headers['content-type']).toMatch(/text\/csv/)
         const [encabezado, fila] = res.text.replace('\ufeff', '').split('\r\n')
-        expect(encabezado).toBe('Estudiante,Cedula,Correo,Recurso,Tipo,Monto,Dias,Estado,Registrada el,Fecha de pago,Motivo de anulacion')
+        expect(encabezado).toBe('Estudiante,Cedula,Correo,Recurso,Tipo,Monto,Dias,Estado,Registrada el,Fecha de pago,Motivo de anulacion,Comprobante (URL),Referencia,Revisada el')
         expect(fila.startsWith('"\'=HYPERLINK')).toBe(true)
         expect(fila).toContain('Atraso,10,2,pendiente')
         expect(res.text.startsWith('\ufeff')).toBe(true)

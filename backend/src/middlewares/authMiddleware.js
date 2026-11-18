@@ -5,10 +5,14 @@ const verificarTokenJWT = async (req, res, next) => {
     if(!authorization?.startsWith('Bearer ')){
         return res.status(401).json({msg: 'Acceso denegado: token no proporcionado'})
     }
+    let datos
     try{
-        const token = authorization.slice(7)
-        const {id, v} = jwt.verify(token, process.env.JWT_SECRET)
-
+        datos = jwt.verify(authorization.slice(7), process.env.JWT_SECRET)
+    }catch(error){
+        return res.status(401).json({msg: 'Token invalido o expirado'})
+    }
+    try{
+        const {id, v} = datos
         const usuarioBDD = await Usuario.findById(id).select('-password -tokenRecuperacion -tokenRecuperacionExpira')
         if(!usuarioBDD){
             return res.status(401).json({ msg : 'Usuario no encontrado'})
@@ -18,10 +22,13 @@ const verificarTokenJWT = async (req, res, next) => {
             return res.status(401).json({msg: 'Sesion cerrada: inicia sesion nuevamente'})
         }
         req.usuarioHeader = usuarioBDD
-        next()
     }catch(error){
-        return res.status(401).json({msg: 'Token invalido o expirado'})
+        // un fallo de la base de datos no es una sesion invalida: con 401 el frontend cerraria la sesion
+        if(error?.name === 'CastError') return res.status(401).json({msg: 'Token invalido o expirado'})
+        console.error(`No se pudo verificar la sesion: ${error.message}`)
+        return res.status(500).json({msg: 'No se pudo verificar la sesion, intenta mas tarde'})
     }
+    next()
 }
 // sesion opcional: sin encabezado Authorization sigue como invitado; con el encabezado lo valida igual que verificarTokenJWT
 const verificarTokenOpcional = (req, res, next) => {

@@ -1,7 +1,7 @@
 import {FACULTADES} from '../models/Usuario.js'
 import {ESTADOS_PRESTAMO} from '../models/Prestamo.js'
 import {ESTADOS_PENALIZACION} from '../models/Penalizacion.js'
-import {CONDICIONES, normalizarFechaDevolucion, limiteMaximoDevolucion, horarioActivo, dentroDeHorario, mensajeHorario} from '../helpers/politicasHelper.js'
+import {CONDICIONES, DIAS_MAX_PRESTAMO, normalizarFechaDevolucion, limiteMaximoDevolucion, horarioActivo, dentroDeHorario, mensajeHorario} from '../helpers/politicasHelper.js'
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(\s[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*$/
@@ -144,6 +144,21 @@ const precioValido = (precio) => {
 }
 const MSG_PRECIO = `El precio debe ser un numero entre 0 y ${PRECIO_MAXIMO}`
 
+// etiquetas: arreglo de textos (JSON) o texto separado por comas (multipart); maximo 10, de 2 a 30 caracteres
+const ETIQUETAS_MAX = 10
+const MSG_ETIQUETAS = `Las etiquetas deben ser una lista de maximo ${ETIQUETAS_MAX} textos de 2 a 30 caracteres`
+const etiquetasValidas = (valor) => {
+    const lista = typeof valor === 'string' ? valor.split(',') : valor
+    if(!Array.isArray(lista) || !lista.every(e => typeof e === 'string')) return false
+    const limpias = lista.map(e => e.trim()).filter(Boolean)
+    return limpias.length <= ETIQUETAS_MAX && limpias.every(e => e.length >= 2 && e.length <= 30)
+}
+
+// imagen como texto: vacia (quitar la imagen) o una URL http(s) de hasta 500 caracteres
+const imagenTextoValida = (imagen) => typeof imagen === 'string'
+    && (imagen.trim() === '' || (imagen.trim().length <= 500 && /^https?:\/\/\S+$/i.test(imagen.trim())))
+const MSG_IMAGEN = 'La imagen debe ser una URL http(s) valida o un archivo'
+
 // valida los datos recibidos al registrar un recurso
 const validarRecurso = (req, res, next) => {
     const {nombre, descripcion, categoria, estado, imagen, precio} = req.body
@@ -162,19 +177,22 @@ const validarRecurso = (req, res, next) => {
     if(descripcion !== undefined && (typeof descripcion !== 'string' || descripcion.length > 500)){
         return res.status(400).json({msg: 'La descripcion debe ser texto de maximo 500 caracteres'})
     }
-    if(imagen !== undefined && typeof imagen !== 'string'){
-        return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
+    if(imagen !== undefined && !imagenTextoValida(imagen)){
+        return res.status(400).json({msg: MSG_IMAGEN})
     }
     if(precio !== undefined && !precioValido(precio)){
         return res.status(400).json({msg: MSG_PRECIO})
+    }
+    if(req.body.etiquetas !== undefined && !etiquetasValidas(req.body.etiquetas)){
+        return res.status(400).json({msg: MSG_ETIQUETAS})
     }
     next()
 }
 
 // valida los datos recibidos al actualizar un recurso (solo los enviados)
 const validarActualizarRecurso = (req, res, next) => {
-    const {nombre, descripcion, categoria, estado, imagen, precio} = req.body
-    if([nombre, descripcion, categoria, estado, imagen, precio].every(v => v === undefined) && !req.file){
+    const {nombre, descripcion, categoria, estado, imagen, precio, etiquetas} = req.body
+    if([nombre, descripcion, categoria, estado, imagen, precio, etiquetas].every(v => v === undefined) && !req.file){
         return res.status(400).json({msg: 'Envia al menos un campo a modificar'})
     }
     if(nombre !== undefined && (!textoValido(nombre) || nombre.trim().length < 3 || nombre.trim().length > 100)){
@@ -189,11 +207,14 @@ const validarActualizarRecurso = (req, res, next) => {
     if(descripcion !== undefined && (typeof descripcion !== 'string' || descripcion.length > 500)){
         return res.status(400).json({msg: 'La descripcion debe ser texto de maximo 500 caracteres'})
     }
-    if(imagen !== undefined && typeof imagen !== 'string'){
-        return res.status(400).json({msg: 'La imagen debe ser una URL en texto'})
+    if(imagen !== undefined && !imagenTextoValida(imagen)){
+        return res.status(400).json({msg: MSG_IMAGEN})
     }
     if(precio !== undefined && !precioValido(precio)){
         return res.status(400).json({msg: MSG_PRECIO})
+    }
+    if(etiquetas !== undefined && !etiquetasValidas(etiquetas)){
+        return res.status(400).json({msg: MSG_ETIQUETAS})
     }
     next()
 }
@@ -249,8 +270,7 @@ const validarMensajeAsistente = (req, res, next) => {
     next()
 }
 
-// hu003 / hu007 prestamos
-const DIAS_MAX_PRESTAMO = 30
+// hu003 / hu007 prestamos (DIAS_MAX_PRESTAMO vive en politicasHelper)
 
 // valida la solicitud de un prestamo
 const validarSolicitudPrestamo = (req, res, next) => {
@@ -411,6 +431,28 @@ const validarAnulacion = (req, res, next) => {
     next()
 }
 
+// datos opcionales del comprobante de pago (multipart): referencia de la transferencia (3-50) y observaciones (<= 200)
+const validarComprobante = (req, res, next) => {
+    const {referencia, observaciones} = req.body ?? {}
+    if(referencia !== undefined && referencia !== ''
+        && (typeof referencia !== 'string' || referencia.trim().length < 3 || referencia.trim().length > 50)){
+        return res.status(400).json({msg: 'La referencia debe tener entre 3 y 50 caracteres'})
+    }
+    if(observaciones !== undefined && (typeof observaciones !== 'string' || observaciones.length > 200)){
+        return res.status(400).json({msg: 'Las observaciones deben ser texto de maximo 200 caracteres'})
+    }
+    next()
+}
+
+// motivo obligatorio al rechazar el comprobante de pago
+const validarRechazoComprobante = (req, res, next) => {
+    const motivo = req.body?.motivo
+    if(!textoValido(motivo) || motivo.trim().length < 3 || motivo.trim().length > 200){
+        return res.status(400).json({msg: 'El motivo del rechazo debe tener entre 3 y 200 caracteres'})
+    }
+    next()
+}
+
 const validarFiltroNotificaciones = (req, res, next) => {
     const {leida} = req.query
     if(leida !== undefined && !['true', 'false'].includes(leida)){
@@ -444,4 +486,5 @@ const validarEliminarCuenta = (req, res, next) => {
 
 export {validarRegistro, validarLogin, validarActualizarPerfil, validarRecuperarClave, validarRestablecerClave, validarRecurso, validarActualizarRecurso, validarIdRecurso, validarRecomendacion, validarMensajeAsistente,
         validarSolicitudPrestamo, validarIdPrestamo, validarRechazo, validarEscaneo, validarMovimiento,
-        validarFiltrosReporte, validarFiltrosPenalizaciones, validarIdPenalizacion, validarAnulacion, validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}
+        validarFiltrosReporte, validarFiltrosPenalizaciones, validarIdPenalizacion, validarAnulacion, validarComprobante, validarRechazoComprobante,
+        validarFiltroNotificaciones, validarIdNotificacion, validarIdUsuario, validarEliminarCuenta}

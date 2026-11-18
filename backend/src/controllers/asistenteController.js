@@ -77,6 +77,7 @@ const conversar = async (req, res) => {
                 : '',
             resumen?.totalAdeudado > 0
                 ? `Tiene penalizaciones pendientes por $${resumen.totalAdeudado.toFixed(2)}, asi que no puede solicitar recursos hasta regularizarlas con la asociacion.`
+                    + (resumen.totalEnRevision > 0 ? ` De ese monto, $${resumen.totalEnRevision.toFixed(2)} estan en revision: el administrador esta verificando su comprobante de pago.` : '')
                 : ''
         ].filter(Boolean).join(' ')
         const gemini = usarGemini ? await consultarGemini({mensaje, historial, recursos: candidatos, contextoUsuario}) : null

@@ -8,6 +8,8 @@ const TOPE_PORCENTAJE = 100
 const TERMINOS_VERSION = '1.0'
 const CONDICIONES = ['bueno', 'danado', 'incompleto', 'perdido']
 const MS_DIA = 24 * 60 * 60 * 1000
+// plazo maximo de un prestamo en dias calendario (lo valida validarSolicitudPrestamo y lo explica el asistente)
+const DIAS_MAX_PRESTAMO = 30
 
 const numeroEntorno = (nombre, defecto) => {
     const valor = Number(process.env[nombre])
@@ -145,7 +147,7 @@ const textoTerminos = () => {
 }
 
 export {
-    ZONA_HORARIA, TOPE_PORCENTAJE, TERMINOS_VERSION, CONDICIONES, MS_DIA,
+    ZONA_HORARIA, TOPE_PORCENTAJE, TERMINOS_VERSION, CONDICIONES, MS_DIA, DIAS_MAX_PRESTAMO,
     tarifas, horario, horarioActivo, minutosDelDia, dentroDeHorario, mensajeHorario,
     normalizarFechaDevolucion, limiteMaximoDevolucion, calcularAtraso, calcularPenalizaciones, textoTerminos
 }

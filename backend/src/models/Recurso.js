@@ -46,7 +46,12 @@ const RecursoSchema = new Schema({
         default: 0
     }
 },{
-    timestamps: true
+    timestamps: true,
+    // el identificador de cloudinary es interno: no se envia al cliente
+    toJSON: {transform: (doc, ret) => {
+        delete ret.imagenId
+        return ret
+    }}
 })
 
 export {CATEGORIAS, ESTADOS}

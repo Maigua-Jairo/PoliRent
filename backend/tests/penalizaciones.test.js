@@ -65,7 +65,8 @@ describe('GET /api/penalizaciones/mis', () => {
             {_id: 'p2', tipo: 'atraso', monto: 5.5, dias: 1, estado: 'pendiente', recurso: {nombre: 'Proyector'}},
             {_id: 'p3', tipo: 'atraso', monto: 3, estado: 'pagada', recurso: {nombre: 'Naipes'}}
         ]
-        jest.spyOn(Penalizacion, 'find').mockImplementation((filtro) => consulta(filtro.estado === 'pendiente' ? lista.filter(p => p.estado === 'pendiente') : lista))
+        // la deuda se consulta con {estado: {$in: ['pendiente', 'en_revision']}}
+        jest.spyOn(Penalizacion, 'find').mockImplementation((filtro) => consulta(filtro.estado?.$in ? lista.filter(p => filtro.estado.$in.includes(p.estado)) : lista))
         jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([
             {_id: 'v1', fechaDevolucion: new Date(Date.now() - 2 * DIA + 60000), recurso: {_id: 'r1', nombre: 'Laptop', precio: 400}}
         ]))
@@ -114,7 +115,7 @@ describe('Administrador: listar, pagar y anular', () => {
         penalizacion.estado = 'pagada'
         const res = await request(app).put(`/api/penalizaciones/${ID}/pagar`).set('Authorization', token(ADMIN))
         expect(res.status).toBe(400)
-        expect(res.body.msg).toBe('Solo se pueden modificar penalizaciones pendientes')
+        expect(res.body.msg).toBe('Solo se pueden pagar penalizaciones pendientes o en revision')
     })
 
     test('una penalizacion inexistente responde 404', async () => {

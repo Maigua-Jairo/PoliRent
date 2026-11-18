@@ -15,12 +15,15 @@ import swaggerUi from 'swagger-ui-express'
 import especificacion from './docs/openapi.js'
 
 const app = express()
+// no anuncia que el servidor usa Express
+app.disable('x-powered-by')
 
 // FRONTEND_URL admite varios origenes separados por coma; sin definir se permite cualquiera (desarrollo)
 const origenes = process.env.FRONTEND_URL?.split(',').map(o => o.trim().replace(/\/$/, '')).filter(Boolean)
 app.use(cors({origin: origenes?.length ? origenes : true}))
 if(process.env.NODE_ENV !== 'test') app.use(morgan('dev'))
-app.use(express.json())
+// limite explicito del cuerpo JSON; uno mayor responde 400 (ver manejarErrores)
+app.use(express.json({limit: '100kb'}))
 
 app.get('/',(req, res)=>{
     res.json({

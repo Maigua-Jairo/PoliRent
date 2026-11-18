@@ -10,6 +10,10 @@ const PESO_CATEGORIA = 1
 const PESO_DESCRIPCION = 1
 const PESO_SELECCIONADO = 0.5
 const PESO_RELACIONADO = 0.4
+// peso del parecido por terminos relacionados frente al parecido directo. Se calculan por separado para que
+// un recurso que solo comparte vocabulario relacionado (p. ej. "cautin" para "robot") no supere a uno que
+// coincide con las palabras del estudiante: con muchos relacionados el coseno conjunto diluia los directos
+const PESO_COMPLEMENTO = 0.5
 // peso del historial de prestamos frente al parecido por texto
 const PESO_COLABORATIVO = 0.3
 
@@ -25,52 +29,92 @@ const STOPWORDS = new Set([
 const GRUPOS_RELACIONADOS = [
     // robotica y electronica
     ['robot', 'robotica', 'arduino', 'sensor', 'servo', 'motor', 'microcontrolador', 'raspberry', 'electronica', 'circuito', 'protoboard', 'multimetro', 'soldador', 'led',
-        'esp32', 'jumper', 'resistencia', 'transistor', 'capacitor', 'relay', 'rele', 'driver', 'pcb', 'estaño', 'cautin', 'seguidor', 'minisumo', 'sumo', 'automatizacion', 'iot', 'domotica'],
+        'esp32', 'jumper', 'resistencia', 'transistor', 'capacitor', 'relay', 'rele', 'driver', 'pcb', 'estaño', 'cautin', 'seguidor', 'minisumo', 'sumo', 'automatizacion', 'iot', 'domotica',
+        'distancia', 'ultrasonico', 'infrarrojo', 'soldadura', 'placa', 'mecatronica'],
     // programacion y computo
     ['programacion', 'programar', 'software', 'codigo', 'desarrollo', 'laptop', 'portatil', 'computadora', 'monitor', 'teclado', 'mouse', 'raton',
-        'python', 'java', 'javascript', 'app', 'aplicacion', 'web', 'hackathon', 'servidor', 'tablet', 'disco', 'usb', 'pendrive', 'cargador'],
+        'python', 'java', 'javascript', 'app', 'aplicacion', 'web', 'hackathon', 'servidor', 'tablet', 'disco', 'usb', 'pendrive', 'cargador',
+        'frontend', 'backend', 'android', 'ios'],
     // ciencia de datos e inteligencia artificial
-    ['datos', 'inteligencia', 'artificial', 'ia', 'machine', 'learning', 'modelo', 'entrenamiento', 'gpu', 'servidor', 'nube', 'python', 'estadistica', 'analisis'],
+    // ("entrenamiento" se deja en deportes: aqui traia los conos de entrenamiento a los proyectos de IA)
+    ['datos', 'inteligencia', 'artificial', 'ia', 'machine', 'learning', 'modelo', 'gpu', 'servidor', 'nube', 'python', 'estadistica', 'analisis', 'neuronal', 'dataset'],
     // presentaciones y eventos academicos
     ['presentacion', 'presentar', 'exposicion', 'exponer', 'sustentacion', 'sustentar', 'tesis', 'auditorio', 'conferencia', 'charla', 'diapositiva', 'proyector', 'pantalla', 'hdmi', 'puntero', 'microfono', 'parlante', 'altavoz',
-        'adaptador', 'clicker', 'atril', 'congreso', 'seminario', 'ponencia', 'webinar', 'taller', 'capacitacion'],
+        'adaptador', 'clicker', 'atril', 'congreso', 'seminario', 'ponencia', 'webinar', 'taller', 'capacitacion', 'defensa', 'titulacion', 'grado', 'expositor'],
+    // cables y adaptadores para conectar equipos
+    ['adaptador', 'hdmi', 'vga', 'usb', 'conectar', 'conector', 'conexion', 'cable'],
     // audio y sonido
-    ['audio', 'sonido', 'microfono', 'parlante', 'altavoz', 'bocina', 'amplificador', 'mezclador', 'consola', 'audifono', 'auricular', 'musica', 'dj', 'megafono', 'podcast'],
+    ['audio', 'sonido', 'microfono', 'parlante', 'altavoz', 'bocina', 'amplificador', 'mezclador', 'consola', 'audifono', 'auricular', 'musica', 'dj', 'megafono', 'podcast',
+        'guitarra', 'concierto', 'cultura', 'cantar', 'banda', 'locucion', 'voz'],
     // redes y conectividad
-    ['red', 'router', 'switch', 'ethernet', 'cable', 'wifi', 'internet', 'conectividad', 'cisco', 'rj45', 'ponchadora', 'servidor', 'ciberseguridad'],
+    ['red', 'router', 'switch', 'ethernet', 'cable', 'wifi', 'internet', 'conectividad', 'cisco', 'rj45', 'ponchadora', 'servidor', 'ciberseguridad',
+        'inalambrico', 'lan', 'utp', 'cableado', 'puerto', 'ccna', 'telecomunicacion'],
     // fotografia, video y transmision
-    ['video', 'fotografia', 'foto', 'camara', 'filmar', 'grabacion', 'tripode', 'iluminacion', 'microfono', 'edicion',
-        'lente', 'flash', 'estabilizador', 'gimbal', 'softbox', 'croma', 'streaming', 'transmision', 'webcam', 'memoria', 'sd', 'cortometraje', 'documental'],
+    ['video', 'fotografia', 'camara', 'filmar', 'grabacion', 'tripode', 'iluminacion', 'microfono', 'edicion',
+        'lente', 'flash', 'estabilizador', 'gimbal', 'softbox', 'croma', 'streaming', 'transmision', 'webcam', 'memoria', 'sd', 'cortometraje', 'documental',
+        'pelicula', 'cine', 'youtube', 'vlog', 'vivo', 'reflex'],
     // estudio y ciencias basicas
     ['calculadora', 'matematica', 'fisica', 'quimica', 'calculo', 'formula', 'ejercicio', 'cientifica', 'libro', 'texto', 'estudio',
-        'algebra', 'estadistica', 'ecuacion', 'graficadora', 'tutoria', 'examen', 'deber', 'investigacion', 'diccionario', 'enciclopedia'],
+        'algebra', 'estadistica', 'ecuacion', 'graficadora', 'tutoria', 'examen', 'deber', 'investigacion', 'diccionario', 'enciclopedia',
+        'grafico', 'probabilidad', 'trigonometria', 'apunte'],
     // laboratorio quimico y biologico
-    ['laboratorio', 'microscopio', 'balanza', 'probeta', 'matraz', 'pipeta', 'reactivo', 'quimica', 'biologia', 'bata', 'guante', 'experimento', 'ph', 'termometro'],
+    ['laboratorio', 'microscopio', 'balanza', 'probeta', 'matraz', 'pipeta', 'reactivo', 'quimica', 'biologia', 'bata', 'guante', 'experimento', 'ph', 'termometro',
+        'cristaleria', 'solucion', 'muestra', 'celula', 'pesar'],
     // electrica y energia
-    ['electrica', 'energia', 'fuente', 'bateria', 'voltaje', 'corriente', 'osciloscopio', 'generador', 'inversor', 'solar', 'transformador', 'multimetro', 'extension', 'regleta'],
+    ['electrica', 'energia', 'fuente', 'bateria', 'voltaje', 'corriente', 'osciloscopio', 'generador', 'inversor', 'solar', 'transformador', 'multimetro', 'extension', 'regleta',
+        'alimentacion', 'panel', 'renovable', 'tomacorriente', 'enchufe'],
     // taller mecanico y herramientas
-    ['mecanica', 'herramienta', 'taladro', 'destornillador', 'alicate', 'sierra', 'martillo', 'calibrador', 'flexometro', 'lija', 'torno', 'llave', 'pegamento', 'silicona', 'taller'],
+    ['mecanica', 'herramienta', 'taladro', 'destornillador', 'alicate', 'sierra', 'martillo', 'calibrador', 'flexometro', 'lija', 'torno', 'llave', 'pegamento', 'silicona', 'taller',
+        'pieza', 'reparar', 'arreglar', 'madera', 'perforar', 'tornillo', 'vernier'],
     // fabricacion digital y prototipado
     ['impresora', 'impresion', '3d', 'filamento', 'prototipo', 'maqueta', 'diseño',
-        'cnc', 'laser', 'corte', 'modelado', 'escaner', 'cad', 'autocad', 'solidworks', 'resina', 'pla'],
+        'cnc', 'laser', 'corte', 'modelado', 'escaner', 'cad', 'autocad', 'solidworks', 'resina', 'pla', 'pieza', 'silicona'],
     // ingenieria civil y topografia
-    ['civil', 'topografia', 'teodolito', 'gps', 'plano', 'construccion', 'estructura', 'hormigon', 'flexometro', 'autocad', 'casco', 'chaleco'],
+    ['civil', 'topografia', 'teodolito', 'gps', 'plano', 'construccion', 'estructura', 'hormigon', 'flexometro', 'autocad', 'casco', 'chaleco',
+        'levantamiento', 'terreno', 'mapeo', 'nivelacion', 'coordenada'],
     // salidas de campo (geologia, ambiental)
-    ['campo', 'salida', 'excursion', 'geologia', 'ambiental', 'brujula', 'gps', 'mochila', 'linterna', 'carpa', 'casco', 'botiquin'],
+    ['campo', 'salida', 'excursion', 'geologia', 'ambiental', 'brujula', 'gps', 'mochila', 'linterna', 'carpa', 'casco', 'botiquin',
+        'mapeo', 'roca', 'terreno', 'coordenada'],
     // drones y aeromodelismo
     ['dron', 'drone', 'aeromodelismo', 'vuelo', 'helice', 'bateria', 'aerea', 'mapeo', 'camara'],
     // videojuegos y realidad virtual
     ['videojuego', 'gaming', 'gamer', 'esport', 'consola', 'mando', 'joystick', 'vr', 'virtual', 'realidad', 'oculus', 'simulador', 'pantalla'],
-    // juegos de mesa y deportes
-    ['juego', 'ajedrez', 'domino', 'carta', 'mesa', 'recreacion', 'balon', 'futbol', 'deporte', 'cancha', 'torneo', 'evento',
-        'voley', 'voleibol', 'basquet', 'baloncesto', 'pingpong', 'tenis', 'raqueta', 'cronometro', 'silbato', 'cono', 'chaleco', 'uniforme', 'campeonato', 'olimpiada'],
+    // juegos de mesa (antes compartian grupo con los deportes y los balones tapaban a los naipes)
+    ['juego', 'ajedrez', 'domino', 'carta', 'naipe', 'baraja', 'mesa', 'recreacion', 'noche'],
+    // deportes
+    ['balon', 'futbol', 'deporte', 'cancha', 'torneo', 'voley', 'basquet', 'pingpong', 'tenis', 'raqueta', 'cronometro', 'silbato', 'cono', 'chaleco', 'uniforme',
+        'campeonato', 'olimpiada', 'interfacultad', 'partido', 'entrenamiento', 'arbitro'],
     // logistica de eventos de la asociacion
-    ['evento', 'feria', 'stand', 'carpa', 'toldo', 'silla', 'mesa', 'banner', 'letrero', 'decoracion', 'casa', 'abierta', 'bienvenida', 'integracion', 'inscripcion', 'extension'],
+    ['evento', 'feria', 'stand', 'carpa', 'toldo', 'silla', 'mesa', 'banner', 'letrero', 'decoracion', 'casa', 'abierta', 'bienvenida', 'integracion', 'inscripcion', 'extension',
+        'plegable', 'festival', 'cultura', 'concierto'],
     // emprendimiento y gestion
-    ['emprendimiento', 'negocio', 'startup', 'pitch', 'marketing', 'publicidad', 'feria', 'stand', 'concurso', 'innovacion'],
+    ['emprendimiento', 'negocio', 'startup', 'pitch', 'marketing', 'publicidad', 'feria', 'stand', 'concurso', 'innovacion', 'producto', 'venta'],
     // talleres y trabajo en grupo
-    ['pizarra', 'marcador', 'papelografo', 'rotafolio', 'borrador', 'tiza', 'taller', 'curso', 'capacitacion', 'reunion']
+    ['pizarra', 'marcador', 'papelografo', 'rotafolio', 'borrador', 'tiza', 'taller', 'curso', 'capacitacion', 'reunion', 'idea', 'planificacion', 'lluvia']
 ]
+
+// Variantes explicitas: formas derivadas, sinonimos y palabras coloquiales que se tratan como el termino del catalogo.
+// Se aplican al contexto del estudiante y al texto de los recursos (despues de quitar tildes y plurales).
+// Solo palabras completas: no se usan reglas de derivacion, asi "red" no coincide con "redaccion".
+const VARIANTES_TEXTO = {
+    // formas derivadas
+    topografico: 'topografia', topografica: 'topografia', topografo: 'topografia',
+    electronico: 'electronica', electrico: 'electrica', electricidad: 'electrica',
+    quimico: 'quimica', biologico: 'biologia', biologica: 'biologia', biologo: 'biologia',
+    robot: 'robotica', robotico: 'robotica', mecanico: 'mecanica', fotografico: 'fotografia', fotografica: 'fotografia', fotografo: 'fotografia', foto: 'fotografia',
+    graficar: 'graficadora', inalambrica: 'inalambrico', wireless: 'inalambrico', portable: 'portatil',
+    geologico: 'geologia', geologica: 'geologia', estadistico: 'estadistica', matematico: 'matematica',
+    cultural: 'cultura', musical: 'musica', musico: 'musica', computador: 'computadora', pc: 'computadora',
+    // verbos y sinonimos coloquiales
+    soldar: 'soldador', soldando: 'soldador', medir: 'medicion', mida: 'medicion', mide: 'medicion', medida: 'medicion', medidor: 'medicion',
+    imprimir: 'impresion', impreso: 'impresion', grabar: 'grabacion', grabando: 'grabacion', filmacion: 'filmar',
+    transmitir: 'transmision', stream: 'streaming', live: 'vivo', exponer: 'exposicion', expongo: 'exposicion',
+    presentar: 'presentacion', sustentar: 'sustentacion', slide: 'diapositiva', powerpoint: 'diapositiva', programar: 'programacion',
+    programador: 'programacion', desarrollar: 'desarrollo', emprender: 'emprendimiento', emprendedor: 'emprendimiento',
+    lab: 'laboratorio', ia: 'inteligencia', ai: 'inteligencia', ml: 'machine',
+    basket: 'basquet', basketball: 'basquet', baloncesto: 'basquet', volley: 'voley', voleibol: 'voley', soccer: 'futbol',
+    ping: 'pingpong', pong: 'pingpong'
+}
 
 const normalizar = (texto) => String(texto ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -81,12 +125,17 @@ const raiz = (palabra) => {
     if (palabra.length > 3 && palabra.endsWith('e')) palabra = palabra.slice(0, -1)
     return palabra
 }
+// variantes ya normalizadas (sin tildes ni plural) -> termino del catalogo
+const VARIANTES = new Map(Object.entries(VARIANTES_TEXTO).map(([v, t]) => [raiz(normalizar(v)), raiz(normalizar(t))]))
+const canonico = (palabra) => VARIANTES.get(palabra) ?? palabra
+
 const tokenizar = (texto) => normalizar(texto)
     .split(/[^a-z0-9]+/)
     .filter(p => p.length > 1 && !STOPWORDS.has(p))
     .map(raiz)
+    .map(canonico)
 
-const GRUPOS = GRUPOS_RELACIONADOS.map(g => new Set(g.map(t => raiz(normalizar(t)))))
+const GRUPOS = GRUPOS_RELACIONADOS.map(g => new Set(g.map(t => canonico(raiz(normalizar(t))))))
 
 // suma "peso" veces cada termino al mapa de frecuencias
 const acumular = (mapa, tokens, peso) => {
@@ -196,21 +245,33 @@ const recomendarRecursos = (recursos, { contexto = '', seleccionados = [], limit
     const normaConsulta = norma(vectorConsulta)
     const hayHistorial = colaborativo.size > 0
     if (normaConsulta === 0 && !hayHistorial) return []
+    const normaDirectos = norma(new Map([...vectorConsulta].filter(([t]) => directos.has(t))))
+    const normaRelacionados = norma(new Map([...vectorConsulta].filter(([t]) => !directos.has(t))))
 
     const calculados = candidatos.map((recurso, i) => {
         const vectorRecurso = new Map([...frecuencias[i]].map(([t, f]) => [t, f * idf(t)]))
-        let producto = 0
+        let productoDirecto = 0
+        let productoRelacionado = 0
         const coincidentes = []
         const relacionadosEncontrados = []
         for (const [t, v] of vectorRecurso) {
             if (!vectorConsulta.has(t)) continue
-            producto += v * vectorConsulta.get(t)
-            if (directos.has(t)) coincidentes.push(t)
-            else relacionadosEncontrados.push(t)
+            if (directos.has(t)) {
+                productoDirecto += v * vectorConsulta.get(t)
+                coincidentes.push(t)
+            } else {
+                productoRelacionado += v * vectorConsulta.get(t)
+                relacionadosEncontrados.push(t)
+            }
         }
         const normaRecurso = norma(vectorRecurso)
-        const coseno = normaRecurso && normaConsulta ? producto / (normaRecurso * normaConsulta) : 0
-        return { recurso, coseno, coincidentes, relacionadosEncontrados }
+        const coseno = (producto, normaParte) => normaRecurso && normaParte ? producto / (normaRecurso * normaParte) : 0
+        return {
+            recurso,
+            coseno: coseno(productoDirecto, normaDirectos) + PESO_COMPLEMENTO * coseno(productoRelacionado, normaRelacionados),
+            coincidentes,
+            relacionadosEncontrados
+        }
     })
 
     // el parecido por texto se normaliza respecto al mejor candidato y se mezcla con el historial

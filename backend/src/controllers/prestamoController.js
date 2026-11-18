@@ -5,8 +5,9 @@ import {generarCodigoQR, generarImagenQR} from '../helpers/qrHelper.js'
 import {notificar, notificarAdministradores, formatearFecha} from '../helpers/notificacionHelper.js'
 import {rangoFechas} from '../helpers/reporteHelper.js'
 import {TERMINOS_VERSION, horarioActivo, dentroDeHorario, mensajeHorario, calcularPenalizaciones} from '../helpers/politicasHelper.js'
-import {totalPendiente, formatoDolares} from '../helpers/penalizacionHelper.js'
+import {deudaPenalizaciones, formatoDolares} from '../helpers/penalizacionHelper.js'
 import {cloudinaryConfigurado, subirImagen, eliminarImagen} from '../config/cloudinary.js'
+import {MSG_CONFLICTO, esConflictoVersion} from '../helpers/responseHelper.js'
 
 const CAMPOS_USUARIO = 'nombres apellidos cedula correo facultad'
 const CAMPOS_RECURSO = 'nombre categoria estado imagen precio'
@@ -48,6 +49,11 @@ const datosPrestamo = (p) => ({
 
 const esDelUsuario = (prestamo, usuario) => String(prestamo.usuario?._id ?? prestamo.usuario) === String(usuario._id)
 
+// dos operaciones simultaneas sobre la misma solicitud (p. ej. dos aprobaciones): la segunda choca con la version (400)
+const responderError = (res, error, texto) => esConflictoVersion(error)
+    ? res.status(400).json({msg: MSG_CONFLICTO})
+    : res.status(500).json({msg: `${texto} - ${error}`})
+
 // HU-007: solicitar un prestamo (la fecha ya llega normalizada por validarSolicitudPrestamo)
 const solicitarPrestamo = async (req, res) => {
     const {recursoId, fechaDevolucion, motivo, docenteReferencia} = req.body
@@ -64,10 +70,12 @@ const solicitarPrestamo = async (req, res) => {
         if(activa){
             return res.status(400).json({msg: mensajePrestamoActivo(activa.estado, activa.recurso?.nombre)})
         }
-        // con penalizaciones pendientes no puede solicitar otro recurso
-        const deuda = await totalPendiente(req.usuarioHeader._id)
-        if(deuda > 0){
-            return res.status(400).json({msg: `Tienes penalizaciones pendientes por ${formatoDolares(deuda)}. Regularizalas con la asociacion antes de solicitar otro recurso`})
+        // con penalizaciones pendientes o en revision (comprobante sin confirmar) no puede solicitar otro recurso
+        const deuda = await deudaPenalizaciones(req.usuarioHeader._id)
+        if(deuda.total > 0){
+            return res.status(400).json({msg: deuda.enRevision > 0
+                ? `Tienes penalizaciones pendientes por ${formatoDolares(deuda.total)}, de las cuales ${formatoDolares(deuda.enRevision)} estan en revision. Podras solicitar otro recurso cuando el administrador confirme el pago`
+                : `Tienes penalizaciones pendientes por ${formatoDolares(deuda.total)}. Regularizalas con la asociacion antes de solicitar otro recurso`})
         }
         if(recurso.estado !== 'disponible'){
             return res.status(400).json({msg: 'El recurso no esta disponible'})
@@ -141,7 +149,7 @@ const cancelarPrestamo = async (req, res) => {
         await prestamo.save()
         res.status(200).json({msg: 'Solicitud cancelada correctamente', prestamo: datosPrestamo(prestamo)})
     }catch(error){
-        res.status(500).json({msg: `Error al cancelar la solicitud - ${error}`})
+        responderError(res, error, 'Error al cancelar la solicitud')
     }
 }
 
@@ -208,7 +216,7 @@ const aprobarPrestamo = async (req, res) => {
         notificar(prestamo.usuario, 'aprobado', `Tu solicitud de "${recurso.nombre}" fue aprobada. Coordina el retiro del recurso con la asociacion estudiantil.`, prestamo._id)
         res.status(200).json({msg: 'Solicitud aprobada correctamente', prestamo: datosPrestamo(prestamo), qr})
     }catch(error){
-        res.status(500).json({msg: `Error al aprobar la solicitud - ${error}`})
+        responderError(res, error, 'Error al aprobar la solicitud')
     }
 }
 
@@ -230,7 +238,7 @@ const rechazarPrestamo = async (req, res) => {
         notificar(prestamo.usuario, 'rechazado', `Tu solicitud de "${recurso?.nombre ?? 'el recurso'}" fue rechazada.${prestamo.motivoRechazo ? ` Motivo: ${prestamo.motivoRechazo}` : ''}`, prestamo._id)
         res.status(200).json({msg: 'Solicitud rechazada correctamente', prestamo: datosPrestamo(prestamo)})
     }catch(error){
-        res.status(500).json({msg: `Error al rechazar la solicitud - ${error}`})
+        responderError(res, error, 'Error al rechazar la solicitud')
     }
 }
 
@@ -375,7 +383,7 @@ const escanearQR = async (req, res) => {
         }
         await registrarMovimiento(req, res, prestamo)
     }catch(error){
-        res.status(500).json({msg: `Error al procesar el QR - ${error}`})
+        responderError(res, error, 'Error al procesar el QR')
     }
 }
 
@@ -388,7 +396,7 @@ const movimientoPorId = (esperada) => async (req, res) => {
         }
         await registrarMovimiento(req, res, prestamo, esperada)
     }catch(error){
-        res.status(500).json({msg: `Error al registrar la ${esperada} - ${error}`})
+        responderError(res, error, `Error al registrar la ${esperada}`)
     }
 }
 const entregarPrestamo = movimientoPorId('entrega')
