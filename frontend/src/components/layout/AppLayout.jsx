@@ -33,6 +33,7 @@ const navegacionPorRol = (usuario) => {
         items: [
           { to: '/admin/solicitudes', etiqueta: 'Solicitudes de préstamo', icono: iconos.solicitudes },
           { to: '/admin/entrega', etiqueta: 'Entrega y devolución', icono: iconos.camion },
+          { to: '/admin/penalizaciones', etiqueta: 'Penalizaciones', icono: iconos.historial },
         ],
       },
       {
@@ -60,6 +61,7 @@ const navegacionPorRol = (usuario) => {
       items: [
         { to: '/dashboard', etiqueta: 'Inicio', icono: iconos.inicio, end: true },
         { to: '/solicitudes', etiqueta: 'Mis Solicitudes', icono: iconos.solicitudes },
+        { to: '/penalizaciones', etiqueta: 'Mis penalizaciones', icono: iconos.historial },
         { to: '/recomendaciones', etiqueta: 'Recomendaciones inteligentes', icono: iconos.destello },
         { to: '/perfil', etiqueta: 'Mi Cuenta', icono: iconos.cuenta },
       ],

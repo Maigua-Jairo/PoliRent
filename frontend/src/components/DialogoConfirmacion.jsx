@@ -2,7 +2,18 @@ import { useEffect, useRef } from 'react'
 import { btnSecondary } from './auth/authStyles.jsx'
 
 /* ---------- Diálogo modal de confirmación (Escape o clic fuera cancela) ---------- */
-export default function DialogoConfirmacion({ abierto, titulo, children, textoConfirmar = 'Confirmar', textoCancelar = 'Cancelar', procesando, onConfirmar, onCancelar }) {
+export default function DialogoConfirmacion({
+  abierto,
+  titulo,
+  children,
+  textoConfirmar = 'Confirmar',
+  textoCancelar = 'Cancelar',
+  procesando,
+  confirmarDeshabilitado = false,
+  tonoConfirmar = 'destructivo',
+  onConfirmar,
+  onCancelar,
+}) {
   const botonCancelar = useRef(null)
 
   useEffect(() => {
@@ -37,8 +48,12 @@ export default function DialogoConfirmacion({ abierto, titulo, children, textoCo
           <button
             type="button"
             onClick={onConfirmar}
-            disabled={procesando}
-            className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-60"
+            disabled={procesando || confirmarDeshabilitado}
+            className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${
+              tonoConfirmar === 'principal'
+                ? 'bg-brand-600 hover:bg-brand-700 focus-visible:outline-brand-600'
+                : 'bg-red-600 hover:bg-red-700 focus-visible:outline-red-600'
+            }`}
           >
             {procesando ? 'Procesando…' : textoConfirmar}
           </button>

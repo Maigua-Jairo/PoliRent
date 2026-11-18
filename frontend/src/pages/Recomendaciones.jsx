@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ThinkingOrb } from 'thinking-orbs'
 import Icon from '../components/Icon.jsx'
 import DialogoConfirmacion from '../components/DialogoConfirmacion.jsx'
 import { iconos } from '../components/layout/iconos.jsx'
@@ -125,12 +126,17 @@ export default function Recomendaciones() {
     <div className="space-y-6 motion-safe:animate-aparecer">
       <h1 className="sr-only">Recomendaciones inteligentes</h1>
 
-      <div className="grid gap-6 xl:grid-cols-12">
+      <div className="grid items-start gap-6 xl:grid-cols-12">
         <section aria-label="Conversación con el asistente" className={`${tarjeta} flex min-w-0 flex-col xl:col-span-9`}>
           <header className="mb-3 flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
-            <div>
-              <h2 className="font-bold text-epn-900 dark:text-white">Asistente de recomendaciones</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Tu conversación actual</p>
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-epn-950 text-brand-400 overflow-hidden dark:bg-slate-800">
+                <ThinkingOrb state={enviando ? 'searching' : 'breathing'} size={20} />
+              </span>
+              <div>
+                <h2 className="font-bold text-epn-900 dark:text-white">Asistente de recomendaciones</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Tu conversación actual</p>
+              </div>
             </div>
             <button
               type="button"
@@ -142,7 +148,7 @@ export default function Recomendaciones() {
               Borrar historial
             </button>
           </header>
-          <ol ref={conversacion} className="max-h-[65vh] min-h-80 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6" aria-live="polite">
+          <ol ref={conversacion} className="max-h-[calc(100vh-21rem)] min-h-72 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6" aria-live="polite">
             {mensajes.map((m) =>
               m.autor === 'usuario' ? (
                 <MensajeUsuario key={m.id} mensaje={m} usuario={usuario} />
@@ -153,7 +159,7 @@ export default function Recomendaciones() {
             {enviando && <Escribiendo />}
           </ol>
 
-          <form onSubmit={onSubmit} className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-800">
+          <form onSubmit={onSubmit} className="mt-auto space-y-3 border-t border-slate-200 p-4 dark:border-slate-800">
             {filtrosAbiertos && <PanelFiltros id="filtros-recomendaciones" categoria={categoria} onCategoria={setCategoria} />}
             <div className="flex items-end gap-3">
               <button
@@ -163,11 +169,10 @@ export default function Recomendaciones() {
                 aria-controls="filtros-recomendaciones"
                 aria-label={categoriaActiva ? `Filtros (${categoriaActiva.plural})` : 'Filtros'}
                 title="Filtros de búsqueda"
-                className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 transition-colors ${
-                  filtrosAbiertos || categoriaActiva
+                className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 transition-colors ${filtrosAbiertos || categoriaActiva
                     ? 'bg-brand-500/10 text-brand-600 ring-brand-500/40 dark:text-brand-400'
                     : 'text-slate-500 ring-slate-200 hover:bg-slate-100 dark:text-slate-400 dark:ring-slate-700 dark:hover:bg-slate-800'
-                }`}
+                  }`}
               >
                 <Icon size={20}>{iconos.filtros}</Icon>
                 {categoriaActiva && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />}

@@ -4,7 +4,7 @@ import { listarRecursos } from '../services/recursoService.js'
 import { consultarMetricas } from '../services/reporteService.js'
 import { obtenerMensajeError } from '../services/authService.js'
 
-/* Todas las solicitudes, recursos y métricas del administrador (HU-003, HU-004); `ahora` se fija al recibir los datos */
+/* Solicitudes, recursos y métricas del administrador; `ahora` se fija al recibir los datos */
 export default function useDashboardAdmin() {
   const [version, setVersion] = useState(0)
   const [datos, setDatos] = useState({ cargando: true, error: '', errorMetricas: '', prestamos: [], recursos: [], metricas: null, ahora: 0 })

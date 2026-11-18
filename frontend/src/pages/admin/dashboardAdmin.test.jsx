@@ -21,6 +21,7 @@ vi.mock('../../services/notificacionService.js', () => ({
   marcarNotificacionLeida: vi.fn(),
   marcarTodasNotificacionesLeidas: vi.fn(),
 }))
+vi.mock('../../components/recomendaciones/AsistenteFlotante.jsx', () => ({ default: () => null }))
 
 const admin = { id: '9', nombres: 'Ana', apellidos: 'Torres', rol: 'administrador' }
 
@@ -125,9 +126,11 @@ describe('Dashboard del administrador (HU-003)', () => {
 
     expect(navegacion.getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page')
     expect(navegacion.getByRole('link', { name: 'Herramientas' })).toHaveAttribute('href', '/admin/recursos')
+    expect(navegacion.getByRole('link', { name: 'Penalizaciones' })).toHaveAttribute('href', '/admin/penalizaciones')
     expect(navegacion.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument()
     expect(navegacion.queryByRole('link', { name: 'Configuración' })).not.toBeInTheDocument()
     expect((await screen.findAllByText('Multímetro digital')).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('table', { name: 'Listado completo de penalizaciones registradas' })).not.toBeInTheDocument()
   })
 })
 

@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { ThinkingOrb } from 'thinking-orbs'
+import { BorderBeam } from 'border-beam'
 import Icon from '../Icon.jsx'
 import DialogoConfirmacion from '../DialogoConfirmacion.jsx'
 import { iconos } from '../layout/iconos.jsx'
@@ -73,21 +75,22 @@ export default function AsistenteFlotante() {
   return (
     <div className="fixed right-4 bottom-4 z-[60] flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
       {abierto && (
-        <section
-          id="chat-ayuda-polirent"
-          aria-label="Chat de ayuda PoliRent"
-          className="flex h-[min(34rem,calc(100dvh-7rem))] w-[min(23rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-900"
-        >
-          <header className="flex items-center justify-between bg-epn-950 px-4 py-3 text-white dark:bg-slate-800">
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-brand-300">
-                <Icon size={20}>{iconos.bot}</Icon>
-              </span>
-              <div>
-                <h2 className="text-sm font-bold">Asistente PoliRent</h2>
-                <p className="text-xs text-slate-300">Ayuda y recomendaciones</p>
+        <BorderBeam size="md" colorVariant="colorful" strength={0.7}>
+          <section
+            id="chat-ayuda-polirent"
+            aria-label="Chat de ayuda PoliRent"
+            className="flex h-[min(34rem,calc(100dvh-7rem))] w-[min(23rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-900"
+          >
+            <header className="flex items-center justify-between bg-epn-950 px-4 py-3 text-white dark:bg-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-brand-300 overflow-hidden">
+                  <ThinkingOrb state={enviando ? 'searching' : 'breathing'} size={20} />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold">Asistente PoliRent</h2>
+                  <p className="text-xs text-slate-300">Ayuda y recomendaciones</p>
+                </div>
               </div>
-            </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -142,6 +145,12 @@ export default function AsistenteFlotante() {
                     : 'mr-auto rounded-bl-sm bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700'
                 }`}
               >
+                {mensaje.autor === 'asistente' && (
+                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400">
+                    <ThinkingOrb state="breathing" size={20} />
+                    <span>Asistente</span>
+                  </div>
+                )}
                 <p className="whitespace-pre-line">{mensaje.texto}</p>
                 {mensaje.recomendaciones?.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
@@ -184,7 +193,12 @@ export default function AsistenteFlotante() {
                 )}
               </div>
             ))}
-            {enviando && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">Consultando al asistente…</p>}
+            {enviando && (
+              <div role="status" className="flex items-center gap-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+                <ThinkingOrb state="searching" size={20} />
+                <span>Consultando al asistente…</span>
+              </div>
+            )}
           </div>
 
           <form
@@ -217,7 +231,8 @@ export default function AsistenteFlotante() {
             </div>
           </form>
         </section>
-      )}
+      </BorderBeam>
+    )}
 
       <button
         type="button"
@@ -227,9 +242,13 @@ export default function AsistenteFlotante() {
         aria-label={abierto ? 'Cerrar asistente PoliRent' : 'Abrir asistente PoliRent'}
         aria-expanded={abierto}
         aria-controls="chat-ayuda-polirent"
-        className="group grid h-14 w-14 place-items-center rounded-full bg-brand-600 text-white shadow-xl shadow-brand-900/25 ring-4 ring-white/80 transition hover:-translate-y-1 hover:bg-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 dark:ring-slate-950"
+        className="group grid h-14 w-14 place-items-center rounded-full bg-brand-600 text-white shadow-xl shadow-brand-900/25 ring-4 ring-white/80 transition hover:-translate-y-1 hover:bg-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 dark:ring-slate-950 overflow-hidden"
       >
-        <Icon size={24}>{abierto ? iconos.cerrar : iconos.bot}</Icon>
+        {abierto ? (
+          <Icon size={24}>{iconos.cerrar}</Icon>
+        ) : (
+          <ThinkingOrb state="breathing" size={20} />
+        )}
         {!abierto && (
           <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
             Ayuda y recomendaciones

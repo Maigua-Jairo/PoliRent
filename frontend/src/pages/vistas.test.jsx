@@ -117,14 +117,16 @@ describe('Perfil (HU-002)', () => {
     expect(screen.getByText(/La facultad identifica desde dónde solicitas recursos/)).toBeInTheDocument()
   })
 
-  test('el campo de facultad sigue disponible para un administrador', async () => {
+  test('un administrador no puede cambiar la facultad elegida al crear su cuenta', async () => {
     const administrador = { ...usuario, rol: 'administrador' }
     authService.obtenerPerfil.mockResolvedValue({ usuario: administrador })
     useAuthStore.getState().iniciarSesion({ token: 'jwt', usuario: administrador })
     renderApp('/perfil')
 
-    expect(await screen.findByLabelText('Facultad')).toBeEnabled()
-    expect(screen.queryByText(/La facultad identifica desde dónde solicitas recursos/)).not.toBeInTheDocument()
+    const facultad = await screen.findByLabelText('Facultad')
+    expect(facultad).toBeDisabled()
+    expect(facultad).toHaveValue(usuario.facultad)
+    expect(screen.getByText('La facultad elegida al crear la cuenta no se puede cambiar.')).toBeInTheDocument()
   })
 
   test('la pestaña Seguridad muestra el cambio de contraseña', async () => {

@@ -8,6 +8,7 @@ import Perfil from './pages/Perfil.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Recomendaciones from './pages/Recomendaciones.jsx'
 import MisSolicitudes from './pages/MisSolicitudes.jsx'
+import MisPenalizaciones from './pages/MisPenalizaciones.jsx'
 import DetallePrestamo from './pages/DetallePrestamo.jsx'
 import Catalogo from './pages/Catalogo.jsx'
 import DetalleRecurso from './pages/DetalleRecurso.jsx'
@@ -18,6 +19,7 @@ import AdminSolicitudes from './pages/admin/AdminSolicitudes.jsx'
 import AdminEntrega from './pages/admin/AdminEntrega.jsx'
 import AdminHistorial from './pages/admin/AdminHistorial.jsx'
 import AdminMetricas from './pages/admin/AdminMetricas.jsx'
+import AdminPenalizaciones from './pages/admin/AdminPenalizaciones.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import PublicLayout from './components/layout/PublicLayout.jsx'
 import RutaProtegida from './components/routes/RutaProtegida.jsx'
@@ -50,6 +52,7 @@ function App() {
             <Route path="/recomendaciones" element={<Recomendaciones />} />
             <Route path="/solicitudes" element={<MisSolicitudes />} />
             <Route path="/solicitudes/:id" element={<DetallePrestamo />} />
+            <Route path="/penalizaciones" element={<MisPenalizaciones />} />
           </Route>
 
           {/* Requieren sesión (cualquier rol) */}
@@ -66,6 +69,7 @@ function App() {
             <Route path="/admin/solicitudes" element={<AdminSolicitudes />} />
             <Route path="/admin/entrega" element={<AdminEntrega />} />
             <Route path="/admin/historial" element={<AdminHistorial />} />
+            <Route path="/admin/penalizaciones" element={<AdminPenalizaciones />} />
             <Route path="/admin/metricas" element={<AdminMetricas />} />
           </Route>
         </Route>

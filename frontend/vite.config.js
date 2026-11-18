@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: import.meta.dirname,
   plugins: [react(), tailwindcss()],
   // Respaldo en desarrollo: sin VITE_API_URL las peticiones a /api se reenvían al backend local
   server: {
@@ -14,5 +15,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
+    cache: false,
   },
 })

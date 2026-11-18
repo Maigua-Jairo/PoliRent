@@ -103,7 +103,7 @@ describe('Entrega y devolución', () => {
     renderAdminEntrega()
     await screen.findByRole('table')
 
-    await user.click(screen.getByRole('button', { name: 'Registrar entrega de Libro de cálculo' }))
+    await user.click(await screen.findByRole('button', { name: 'Registrar entrega de Libro de cálculo' }))
     await user.selectOptions(screen.getByLabelText('Condición del recurso al entregarlo'), 'incompleto')
     const evidencia = new File(['foto'], 'evidencia.png', { type: 'image/png' })
     await user.upload(screen.getByLabelText(/Foto de evidencia/), evidencia)

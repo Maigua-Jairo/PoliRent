@@ -88,6 +88,12 @@ export default function Perfil() {
 function FormularioDatos({ usuario, onActualizado }) {
   const [errorServidor, setErrorServidor] = useState('')
   const [mensajeExito, setMensajeExito] = useState('')
+  const esAdmin = esAdministrador(usuario)
+  const facultadBloqueada = !esAdmin || Boolean(usuario?.facultad)
+  const mensajeFacultad = esAdmin
+    ? 'La facultad elegida al crear la cuenta no se puede cambiar.'
+    : 'La facultad identifica desde dónde solicitas recursos y no se puede cambiar.'
+  const hintFacultad = facultadBloqueada ? mensajeFacultad : undefined
   const {
     register,
     handleSubmit,
@@ -151,11 +157,11 @@ function FormularioDatos({ usuario, onActualizado }) {
             label="Facultad"
             icon="cap"
             error={errors.facultad?.message}
-            hint={!esAdministrador(usuario) ? 'La facultad identifica desde dónde solicitas recursos y no se puede cambiar.' : undefined}
+            hint={hintFacultad}
           >
             <select
               {...campo('facultad', validarFacultad)}
-              disabled={!esAdministrador(usuario)}
+              disabled={facultadBloqueada}
               className={`${inputClass(errors.facultad, true, true)} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:disabled:bg-slate-800/60 dark:disabled:text-slate-400`}
             >
               <option value="" disabled>

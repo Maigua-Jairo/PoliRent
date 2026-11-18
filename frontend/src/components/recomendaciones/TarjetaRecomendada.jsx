@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom'
+import { BorderBeam } from 'border-beam'
 import Icon from '../Icon.jsx'
 import ImagenRecurso from '../recursos/ImagenRecurso.jsx'
 import { iconos } from '../layout/iconos.jsx'
 import { buscarCategoria } from '../../utils/recursos.jsx'
 
 /* ---------- Recurso recomendado; la imagen viene de recurso.imagen (Cloudinary) ---------- */
-export default function TarjetaRecomendada({ recurso, razon }) {
+export default function TarjetaRecomendada({ recurso, razon, destacado = true }) {
   const categoria = buscarCategoria(recurso.categoria)
-  return (
-    <article className="flex flex-col rounded-xl bg-white p-3 ring-1 ring-slate-200 transition-shadow hover:shadow-md dark:bg-slate-800/60 dark:ring-slate-700">
+  const tarjeta = (
+    <article className="flex h-full flex-col rounded-xl bg-white p-3 ring-1 ring-slate-200 transition-shadow hover:shadow-md dark:bg-slate-800/60 dark:ring-slate-700">
       <div className="relative">
         <ImagenRecurso recurso={recurso} tamanoIcono={32} className="aspect-4/3 w-full rounded-lg" />
         <span className={`absolute top-2 left-2 rounded-md px-2 py-0.5 text-xs font-bold ${categoria.tono}`}>
@@ -40,4 +41,14 @@ export default function TarjetaRecomendada({ recurso, razon }) {
       </Link>
     </article>
   )
+
+  if (destacado) {
+    return (
+      <BorderBeam size="md" colorVariant="colorful" strength={0.7} className="h-full">
+        {tarjeta}
+      </BorderBeam>
+    )
+  }
+
+  return tarjeta
 }

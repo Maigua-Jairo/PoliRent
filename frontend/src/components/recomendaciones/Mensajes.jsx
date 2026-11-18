@@ -1,3 +1,4 @@
+import { ThinkingOrb } from 'thinking-orbs'
 import Icon from '../Icon.jsx'
 import Avatar from '../Avatar.jsx'
 import { iconos } from '../layout/iconos.jsx'
@@ -7,8 +8,8 @@ import { EJEMPLOS_CONSULTA } from '../../utils/recomendaciones.js'
 
 function AvatarBot() {
   return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-epn-900 text-white dark:bg-brand-500/20 dark:text-brand-300" aria-hidden="true">
-      <Icon size={18}>{iconos.bot}</Icon>
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-epn-900 text-white overflow-hidden dark:bg-brand-500/20 dark:text-brand-300" aria-hidden="true">
+      <ThinkingOrb state="breathing" size={20} />
     </span>
   )
 }
@@ -105,20 +106,12 @@ export function MensajeUsuario({ mensaje, usuario }) {
 }
 
 /* ---------- Indicador mientras el asistente busca ---------- */
-export function Escribiendo() {
+export function Escribiendo({ state = 'searching', size = 64 }) {
   return (
     <li className="flex items-center gap-3" role="status">
-      <AvatarBot />
-      <span className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-slate-100 px-4 py-3 dark:bg-slate-800">
-        <span className="sr-only">Buscando recursos…</span>
-        {[0, 150, 300].map((retraso) => (
-          <span
-            key={retraso}
-            className="h-2 w-2 rounded-full bg-slate-400 motion-safe:animate-bounce"
-            style={{ animationDelay: `${retraso}ms` }}
-            aria-hidden="true"
-          />
-        ))}
+      <ThinkingOrb state={state} size={size} />
+      <span className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-slate-100 px-4 py-3 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        Buscando recursos…
       </span>
     </li>
   )
