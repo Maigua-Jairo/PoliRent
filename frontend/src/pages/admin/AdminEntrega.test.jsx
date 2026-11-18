@@ -31,6 +31,15 @@ const prestamos = [
     fechaDevolucion: '2026-10-25T10:00:00.000Z',
   },
   {
+    _id: 'p-devuelto',
+    estado: 'devuelto',
+    usuario: { nombres: 'Carlos', apellidos: 'Mora' },
+    recurso: { nombre: 'Proyector', categoria: 'tecnico' },
+    fechaEntrega: '2026-10-01T10:00:00.000Z',
+    fechaDevolucion: '2026-10-10T10:00:00.000Z',
+    fechaDevolucionReal: '2026-10-09T14:00:00.000Z',
+  },
+  {
     _id: 'p-pendiente',
     estado: 'pendiente',
     recurso: { nombre: 'Laptop', categoria: 'tecnico' },
@@ -71,10 +80,14 @@ describe('Entrega y devolución', () => {
     expect(tabla.queryByText('Multímetro')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('tab', { name: /Devoluciones/ }))
-    const devoluciones = within(await screen.findByRole('region', { name: 'Tabla de devoluciones por registrar' }))
+    const devoluciones = within(await screen.findByRole('region', { name: 'Tabla de devoluciones pendientes y registradas' }))
     expect(devoluciones.getByText('Multímetro')).toBeInTheDocument()
     expect(devoluciones.getByText(new Date(prestamos[0].fechaEntrega).toLocaleDateString('es-EC'))).toBeInTheDocument()
     expect(devoluciones.getByRole('button', { name: 'Registrar devolución de Multímetro' })).toBeInTheDocument()
+    expect(devoluciones.getByText('Proyector')).toBeInTheDocument()
+    expect(devoluciones.getByText(new Date(prestamos[2].fechaDevolucionReal).toLocaleDateString('es-EC'))).toBeInTheDocument()
+    expect(devoluciones.getByText('Devolución registrada')).toBeInTheDocument()
+    expect(devoluciones.queryByRole('button', { name: 'Registrar devolución de Proyector' })).not.toBeInTheDocument()
     expect(devoluciones.queryByText('Libro de cálculo')).not.toBeInTheDocument()
   })
 

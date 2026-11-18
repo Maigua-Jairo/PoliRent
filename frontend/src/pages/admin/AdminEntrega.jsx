@@ -13,6 +13,12 @@ const nombreUsuario = (usuario) => {
 }
 
 const nombreRecurso = (recurso) => recurso?.nombre ?? 'Recurso eliminado'
+const fechaMovimiento = (prestamo, esEntrega) => {
+  const fecha = esEntrega
+    ? prestamo.createdAt
+    : prestamo.estado === 'devuelto' ? prestamo.fechaDevolucionReal : prestamo.fechaEntrega
+  return fecha ? new Date(fecha).toLocaleDateString('es-EC') : 'Sin fecha'
+}
 
 export default function AdminEntrega() {
   const { cargando, error, prestamos, recargar } = useDashboardAdmin()
@@ -26,14 +32,15 @@ export default function AdminEntrega() {
   const cerrarDevolucion = useCallback(() => setADevolver(null), [])
   const mostrarResultado = useCallback((resultado) => setAviso(resultado), [])
   const esEntrega = seccion === 'entregas'
-  const estadoFlujo = esEntrega ? 'aprobado' : 'entregado'
-  const estadosFlujo = ESTADOS_PRESTAMO.filter((opcion) => opcion.valor === estadoFlujo)
+  const estadosFlujo = ESTADOS_PRESTAMO.filter((opcion) =>
+    esEntrega ? opcion.valor === 'aprobado' : ['entregado', 'devuelto'].includes(opcion.valor),
+  )
   const filas = filtrarPrestamosAdmin(prestamos, {
     busqueda,
     estado,
-    estadosIncluidos: [estadoFlujo],
+    estadosIncluidos: esEntrega ? ['aprobado'] : ['entregado', 'devuelto'],
   })
-  const etiquetaTabla = esEntrega ? 'Tabla de entregas por registrar' : 'Tabla de devoluciones por registrar'
+  const etiquetaTabla = esEntrega ? 'Tabla de entregas por registrar' : 'Tabla de devoluciones pendientes y registradas'
 
   return (
     <div className="space-y-6 motion-safe:animate-aparecer">
@@ -45,7 +52,7 @@ export default function AdminEntrega() {
         <div role="tablist" aria-label="Tipo de movimiento" className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800">
           {[
             { valor: 'entregas', etiqueta: 'Entregas', total: prestamos.filter((prestamo) => prestamo.estado === 'aprobado').length },
-            { valor: 'devoluciones', etiqueta: 'Devoluciones', total: prestamos.filter((prestamo) => prestamo.estado === 'entregado').length },
+            { valor: 'devoluciones', etiqueta: 'Devoluciones', total: prestamos.filter((prestamo) => ['entregado', 'devuelto'].includes(prestamo.estado)).length },
           ].map((opcion) => (
             <button
               key={opcion.valor}
@@ -94,7 +101,7 @@ export default function AdminEntrega() {
                   <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">ID</th>
                   <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">Estudiante</th>
                   <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">Recurso</th>
-                  <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">{esEntrega ? 'Fecha de solicitud' : 'Fecha de entrega'}</th>
+                  <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">{esEntrega ? 'Fecha de solicitud' : 'Fecha del movimiento'}</th>
                   <th scope="col" className="break-words px-2 py-3 font-semibold sm:px-4">Devolución prevista</th>
                   <th scope="col" className="px-2 py-3 text-center font-semibold sm:px-4">Acciones</th>
                 </tr>
@@ -117,7 +124,7 @@ export default function AdminEntrega() {
                     <td colSpan="6" className="px-4 py-6 text-center text-slate-500 dark:text-slate-400">
                       {busqueda || estado
                         ? `No hay ${esEntrega ? 'entregas' : 'devoluciones'} que coincidan con los filtros.`
-                        : esEntrega ? 'No hay entregas pendientes de registrar.' : 'No hay préstamos pendientes de devolución.'}
+                        : esEntrega ? 'No hay entregas pendientes de registrar.' : 'No hay devoluciones registradas ni préstamos pendientes de devolución.'}
                     </td>
                   </tr>
                 )}
@@ -127,9 +134,7 @@ export default function AdminEntrega() {
                     <td className="break-words px-2 py-3 text-slate-700 sm:px-4 dark:text-slate-300">{nombreUsuario(prestamo.usuario)}</td>
                     <td className="break-words px-2 py-3 text-slate-700 sm:px-4 dark:text-slate-300">{nombreRecurso(prestamo.recurso)}</td>
                     <td className="break-words px-2 py-3 text-slate-600 sm:px-4 dark:text-slate-300">
-                      {esEntrega
-                        ? new Date(prestamo.createdAt).toLocaleDateString('es-EC')
-                        : prestamo.fechaEntrega ? new Date(prestamo.fechaEntrega).toLocaleDateString('es-EC') : 'Sin fecha'}
+                      {fechaMovimiento(prestamo, esEntrega)}
                     </td>
                     <td className="break-words px-2 py-3 text-slate-600 sm:px-4 dark:text-slate-300">
                       {prestamo.fechaDevolucion ? new Date(prestamo.fechaDevolucion).toLocaleDateString('es-EC') : 'Sin fecha'}
@@ -144,7 +149,7 @@ export default function AdminEntrega() {
                         >
                           Registrar entrega
                         </button>
-                      ) : (
+                      ) : prestamo.estado === 'entregado' ? (
                         <button
                           type="button"
                           onClick={() => setADevolver(prestamo)}
@@ -153,6 +158,10 @@ export default function AdminEntrega() {
                         >
                           Registrar devolución
                         </button>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-blue-100 px-3 py-2 text-xs font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                          Devolución registrada
+                        </span>
                       )}
                     </td>
                   </tr>
