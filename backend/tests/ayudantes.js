@@ -7,7 +7,7 @@ const consulta = (valor) => {
         then: (ok, error) => promesa().then(ok, error),
         catch: (error) => promesa().catch(error)
     }
-    for(const metodo of ['populate', 'select', 'sort', 'lean', 'limit', 'skip', 'exec']){
+    for(const metodo of ['populate', 'select', 'sort', 'lean', 'limit', 'skip', 'exec', 'collation']){
         cadena[metodo] = () => cadena
     }
     return cadena

@@ -32,7 +32,7 @@ describe('Preguntas frecuentes nuevas', () => {
         // las que ya existian se siguen reconociendo (no se duplican)
         ['como cancelo una solicitud', 'cancelar'],
         ['cuantos dias puedo quedarme con un recurso', 'plazo'],
-        ['por que solo puedo tener un prestamo a la vez', 'prestamo_unico']
+        ['por que solo puedo tener un prestamo a la vez', 'maximo_solicitudes']
     ])('"%s" -> %s', (mensaje, id) => {
         expect(preguntaDe(mensaje)).toBe(id)
         const r = responderLocal(mensaje, [])
@@ -80,9 +80,11 @@ describe('Preguntas frecuentes nuevas', () => {
 })
 
 describe('Reglas del negocio para Gemini', () => {
-    test('incluyen tarifas, horario, un prestamo a la vez, 30 dias y el flujo del comprobante', () => {
+    // "un prestamo a la vez" se reemplazo por el maximo de solicitudes activas
+    test('incluyen tarifas, horario, maximo de solicitudes, 30 dias y el flujo del comprobante', () => {
         const reglas = reglasNegocio()
-        expect(reglas).toContain('un prestamo a la vez')
+        expect(reglas).not.toContain('un prestamo a la vez')
+        expect(reglas).toContain('como maximo 5 solicitudes activas')
         expect(reglas).toContain('30 dias calendario')
         expect(reglas).toContain('entre las 07:00 y las 18:00')
         expect(reglas).toContain('5 % por cada dia o fraccion de atraso, 20 % si se devuelve danado o incompleto, 100 % si se pierde')

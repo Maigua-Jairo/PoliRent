@@ -131,14 +131,14 @@ describe('Administrador: listar, pagar y anular', () => {
     })
 
     test('anular una pendiente guarda el motivo', async () => {
-        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivo: 'El estudiante repuso el articulo'})
+        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivoAnulacion: 'El estudiante repuso el articulo'})
         expect(res.status).toBe(200)
         expect(res.body.penalizacion).toMatchObject({estado: 'anulada', motivoAnulacion: 'El estudiante repuso el articulo'})
     })
 
     test('no se puede anular una penalizacion anulada', async () => {
         penalizacion.estado = 'anulada'
-        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivo: 'Otra vez'})
+        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivoAnulacion: 'Otra vez'})
         expect(res.status).toBe(400)
     })
 

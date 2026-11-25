@@ -127,7 +127,7 @@ describe('Endpoints de metricas y reportes', () => {
         expect(res.status).toBe(200)
         expect(res.headers['content-type']).toMatch(/text\/csv/)
         const [encabezado, fila] = res.text.replace('\ufeff', '').split('\r\n')
-        expect(encabezado).toBe('Estudiante,Cedula,Correo,Recurso,Tipo,Monto,Dias,Estado,Registrada el,Fecha de pago,Motivo de anulacion,Comprobante (URL),Referencia,Revisada el')
+        expect(encabezado).toBe('Estudiante,Cedula,Correo,Recurso,Tipo,Monto,Dias de atraso,Estado,Registrada el,Pagada el,Motivo de anulacion,Comprobante (URL),Referencia,Revisada el')
         expect(fila.startsWith('"\'=HYPERLINK')).toBe(true)
         expect(fila).toContain('Atraso,10,2,pendiente')
         expect(res.text.startsWith('\ufeff')).toBe(true)

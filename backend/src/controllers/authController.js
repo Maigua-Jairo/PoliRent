@@ -10,7 +10,8 @@ const datosUsuario = (u) => ({
     cedula: u.cedula,
     correo: u.correo,
     telefono: u.telefono,
-    facultad: u.facultad,
+    // el administrador no tiene facultad: el campo no se incluye en sus respuestas
+    ...(u.rol !== 'administrador' ? {facultad: u.facultad} : {}),
     rol: u.rol
 })
 
@@ -54,9 +55,14 @@ const login = async (req, res) => {
     const {password} = req.body
     const correo = req.body.correo.trim().toLowerCase()
     try{
+        // mensajes distintos por pedido del revisor (permiten saber que correos estan registrados).
+        // Se mantiene el 401 de siempre: en el login no hay sesion que el frontend pueda cerrar
         const usuarioBDD = await Usuario.findOne({correo})
-        if(!usuarioBDD || !(await usuarioBDD.matchPassword(password))){
-            return res.status(401).json({msg: 'Usuario o Contraseña incorrecta'})
+        if(!usuarioBDD){
+            return res.status(401).json({msg: 'Correo no registrado'})
+        }
+        if(!(await usuarioBDD.matchPassword(password))){
+            return res.status(401).json({msg: 'Contrasena incorrecta'})
         }
         const token = crearTokenJWT(usuarioBDD._id, usuarioBDD.rol, usuarioBDD.versionSesion)
         res.status(200).json({

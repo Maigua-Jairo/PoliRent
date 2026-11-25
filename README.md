@@ -48,6 +48,11 @@ Las variables del **backend** son secretas y solo se configuran en el servicio d
 | `INSTITUTIONAL_EMAIL_DOMAIN` | ✅ | — |
 | `PENALIZACION_ATRASO_DIA` (5), `PENALIZACION_DANIO` (20), `PENALIZACION_PERDIDA` (100): penalizaciones en % del precio del recurso | ✅ | — |
 | `HORARIO_INICIO` (07:00), `HORARIO_FIN` (18:00), `VALIDAR_HORARIO` (true): horario de entrega y devolución, hora de Ecuador | ✅ | — |
+| `MAX_SOLICITUDES_ACTIVAS` (5): solicitudes pendientes, aprobadas o entregadas que un estudiante puede tener a la vez | ✅ | — |
+| `MOTIVO_RECHAZO_MIN` (30), `MOTIVO_RECHAZO_MAX` (200): longitud del motivo al rechazar una solicitud | ✅ | — |
+| `ENTREGA_TOLERANCIA_MIN` (30): minutos antes de la hora programada en los que ya se puede entregar | ✅ | — |
+| `RESERVA_MAX_DIAS_ANTICIPACION` (30): días máximos de anticipación de la entrega | ✅ | — |
+| `RECORDATORIO_HORAS_ANTES` (24,1), `RECORDATORIO_INTERVALO_MIN` (15): recordatorios automáticos de devolución | ✅ | — |
 | `VITE_API_URL` | — | ✅ |
 
 ## Despliegue en Render
@@ -57,4 +62,4 @@ Las variables del **backend** son secretas y solo se configuran en el servicio d
 
 ## Administradores
 
-El registro público siempre crea cuentas con rol `estudiante`. Para convertir una cuenta en administrador, cambia su campo `rol` a `administrador` directamente en la colección `usuarios` de MongoDB.
+El registro público siempre crea cuentas con rol `estudiante` (ningún endpoint crea administradores). El sistema trabaja con un único administrador, que no tiene facultad. Para convertir una cuenta en administrador, cambia su campo `rol` a `administrador` directamente en la colección `usuarios` de MongoDB.

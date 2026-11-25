@@ -49,7 +49,7 @@ describe('POST /api/prestamos (solicitud)', () => {
     const valida = () => ({
         recursoId: ID_RECURSO,
         fechaDevolucion: enDias(3),
-        motivo: 'Exposicion',
+        motivoPrestamo: 'Exposicion',
         aceptaTerminos: true,
         docenteReferencia: {nombre: '  Carlos Ruiz ', correo: 'Carlos.Ruiz@epn.edu.ec', telefono: '0991234567'}
     })
@@ -58,7 +58,9 @@ describe('POST /api/prestamos (solicitud)', () => {
     beforeEach(() => {
         sesion(ESTUDIANTE)
         jest.spyOn(Recurso, 'findById').mockResolvedValue({_id: ID_RECURSO, nombre: 'Proyector Epson', estado: 'disponible'})
-        jest.spyOn(Prestamo, 'findOne').mockReturnValue(consulta(null))
+        // regla de maximo de solicitudes activas: 0 activas
+        jest.spyOn(Prestamo, 'countDocuments').mockResolvedValue(0)
+        jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([]))
         jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([]))
         jest.spyOn(Prestamo, 'create').mockImplementation(async (datos) => ({_id: 'nuevo', estado: 'pendiente', ...datos}))
     })
@@ -85,7 +87,8 @@ describe('POST /api/prestamos (solicitud)', () => {
         process.env.VALIDAR_HORARIO = 'true'
         const res = await solicitar({...valida(), fechaDevolucion: `${enDias(3)}T20:00:00-05:00`})
         expect(res.status).toBe(400)
-        expect(res.body.msg).toBe('La entrega y la devolucion solo se registran entre las 07:00 y las 18:00 (hora de Ecuador)')
+        // el mensaje ahora nombra el campo (antes: el mensaje general del horario)
+        expect(res.body.msg).toBe('La hora de devolucion debe estar entre las 07:00 y las 18:00 (hora de Ecuador)')
     })
 
     test('con el horario activo acepta solo la fecha (se toma a las 18:00)', async () => {
@@ -145,7 +148,7 @@ describe('Entrega y devolucion', () => {
         const res = await devolver()
         expect(res.status).toBe(200)
         expect(res.body).toMatchObject({accion: 'devolucion', recurso: {estado: 'disponible'}, penalizaciones: [], totalPenalizado: 0, advertencias: []})
-        expect(res.body.prestamo.devolucion).toMatchObject({responsableNombre: 'Luis Paz', condicion: 'bueno', evidencia: null})
+        expect(res.body.prestamo.devolucion).toMatchObject({recibidoPor: 'Luis Paz', condicion: 'bueno', evidencia: null})
         expect(prestamo.codigoQR).toBeUndefined()
         expect(Penalizacion.insertMany).not.toHaveBeenCalled()
     })
@@ -154,9 +157,11 @@ describe('Entrega y devolucion', () => {
         prestamo = nuevoPrestamo({fechaDevolucion: new Date(Date.now() - 2 * DIA + 60000)})
         const res = await devolver({responsable: 'Maria Lopez', observaciones: 'Llego tarde'})
         expect(res.status).toBe(200)
-        expect(res.body.penalizaciones).toEqual([expect.objectContaining({tipo: 'atraso', monto: 10, dias: 2, usuario: ESTUDIANTE._id, registradaPor: ADMIN._id})])
+        // la respuesta usa el formato de GET /api/penalizaciones (diasAtraso); registradaPor se comprueba en lo que se guarda
+        expect(res.body.penalizaciones).toEqual([expect.objectContaining({tipo: 'atraso', monto: 10, diasAtraso: 2, usuario: ESTUDIANTE._id})])
+        expect(Penalizacion.insertMany.mock.calls[0][0]).toEqual([expect.objectContaining({dias: 2, registradaPor: ADMIN._id})])
         expect(res.body.totalPenalizado).toBe(10)
-        expect(res.body.prestamo.devolucion).toMatchObject({responsableNombre: 'Maria Lopez', observaciones: 'Llego tarde'})
+        expect(res.body.prestamo.devolucion).toMatchObject({recibidoPor: 'Maria Lopez', observaciones: 'Llego tarde'})
         expect(Notificacion.create).toHaveBeenCalledWith(expect.objectContaining({tipo: 'penalizacion', mensaje: expect.stringContaining('$10.00')}))
     })
 
@@ -238,7 +243,7 @@ describe('Entrega y devolucion', () => {
         const res = await entregar({observaciones: 'Con cable HDMI'})
         expect(res.status).toBe(200)
         expect(res.body).toMatchObject({accion: 'entrega', recurso: {estado: 'prestado'}})
-        expect(res.body.prestamo.entrega).toMatchObject({responsableNombre: 'Luis Paz', observaciones: 'Con cable HDMI', condicion: 'bueno', evidencia: null})
+        expect(res.body.prestamo.entrega).toMatchObject({entregadoPor: 'Luis Paz', observaciones: 'Con cable HDMI', condicion: 'bueno', evidencia: null})
         expect(res.body.penalizaciones).toBeUndefined()
     })
 

@@ -11,7 +11,8 @@ const datosUsuario = (u) => ({
     cedula: u.cedula,
     correo: u.correo,
     telefono: u.telefono,
-    facultad: u.facultad,
+    // el administrador no tiene facultad: el campo no se incluye en sus respuestas
+    ...(u.rol !== 'administrador' ? {facultad: u.facultad} : {}),
     rol: u.rol,
     createdAt: u.createdAt
 })

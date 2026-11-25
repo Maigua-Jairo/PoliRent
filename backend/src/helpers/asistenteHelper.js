@@ -6,7 +6,7 @@
 // Si hay GEMINI_API_KEY, geminiHelper redacta la respuesta con esta misma base de conocimiento
 // y este motor queda como respaldo.
 
-import {tarifas, horario, DIAS_MAX_PRESTAMO} from './politicasHelper.js'
+import {tarifas, horario, DIAS_MAX_PRESTAMO, maxSolicitudesActivas, horasRecordatorio} from './politicasHelper.js'
 
 const TIPOS_RESPUESTA = ['ayuda', 'recomendacion', 'fuera_de_tema']
 
@@ -96,7 +96,8 @@ const PREGUNTAS_FRECUENTES = [
         peso: 0.9,
         get respuesta() {
             return 'Inicia sesión con tu cuenta de estudiante, busca el recurso en la sección Recursos y abre su ficha. '
-                + `Si está disponible, elige la fecha de devolución (máximo ${DIAS_MAX_PRESTAMO} días), escribe opcionalmente el motivo, indica un docente de referencia `
+                + 'Si está disponible, elige cuándo lo recibes (fecha y hora de entrega, puede ser hoy) y la fecha y hora de devolución '
+                + `(máximo ${DIAS_MAX_PRESTAMO} días), escribe opcionalmente el motivo, indica un docente de referencia `
                 + '(nombre y correo), acepta los términos y condiciones y envía la solicitud. '
                 + 'Quedará "En revisión" hasta que la asociación la apruebe o la rechace.'
         },
@@ -108,28 +109,58 @@ const PREGUNTAS_FRECUENTES = [
         claves: ['cuant dia', 'cuanto tiempo', 'plazo', 'fecha devoluc', 'maxim', 'durac', 'hasta cuand', 'quedarm', 'quedar con'],
         get respuesta() {
             const {fin} = horario()
-            return `Al reservar eliges la fecha de devolución: debe ser posterior a hoy y como máximo ${DIAS_MAX_PRESTAMO} días calendario después `
+            return `Al reservar eliges la fecha de devolución: debe ser posterior a la entrega y como máximo ${DIAS_MAX_PRESTAMO} días calendario después de ella `
                 + `(si eliges solo el día, la devolución vence a las ${fin} de ese día). `
                 + `Devuelve el recurso a tiempo: cada día de atraso genera una penalización del ${tarifas().atrasoPorDia} % de su precio.`
         },
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
-        id: 'prestamo_unico',
-        titulo: '¿Puedo pedir varios recursos a la vez?',
-        claves: ['otro recurs', 'mas de un', 'varios', 'dos recurs', 'a la vez', 'al mismo tiempo', 'no pued solicit', 'no pued reserv', 'no me dej', 'por que solo', 'solo un prest'],
-        respuesta: 'Solo puedes tener un préstamo a la vez, para que los recursos de la asociación alcancen para todos los estudiantes. '
-            + 'Mientras tengas una solicitud en revisión, aprobada o un recurso en préstamo, '
-            + 'no puedes solicitar otro: cancela la solicitud o devuelve el recurso y luego podrás reservar uno nuevo. '
-            + 'Tampoco puedes solicitar recursos mientras tengas penalizaciones pendientes o en revisión.',
+        id: 'maximo_solicitudes',
+        titulo: '¿Cuántos recursos puedo pedir a la vez?',
+        claves: ['otro recurs', 'mas de un', 'varios', 'dos recurs', 'a la vez', 'al mismo tiempo', 'no pued solicit', 'no pued reserv', 'no me dej',
+            'por que solo', 'solo un prest', 'cuant solicitud', 'cuant recurs', 'maxim solicitud', 'limit solicitud', 'solicitudes activ', 'cuant pued ped', 'cuant pued solicit'],
+        get respuesta() {
+            const maximo = maxSolicitudesActivas()
+            return `Puedes tener como máximo ${maximo} solicitudes activas al mismo tiempo (en revisión, aprobadas o en préstamo), `
+                + 'para que los recursos de la asociación alcancen para todos. No importa para qué día sea cada una: puedes pedir varias para hoy y otras para otro día, '
+                + `siempre que en total no pases de ${maximo}. Al llegar al máximo, cancela una solicitud pendiente, espera la respuesta o devuelve un recurso. `
+                + 'Tampoco puedes solicitar recursos mientras tengas penalizaciones pendientes o en revisión.'
+        },
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
+    },
+    {
+        id: 'pedir_hoy',
+        titulo: '¿Puedo pedir un recurso para hoy y elegir la hora?',
+        claves: ['para hoy', 'hoy mismo', 'ped hoy', 'reserv hoy', 'solicit hoy', 'hora entreg', 'hora devoluc', 'hora devolv', 'indic hora', 'elij hora', 'escoj hora', 'pongo hora', 'que hora recib'],
+        get respuesta() {
+            const {inicio, fin} = horario()
+            return 'Sí. Al reservar eliges la fecha y la hora de entrega (si no indicas nada, es hoy, desde este momento) y la fecha y la hora de devolución '
+                + `(si eliges solo el día, a las ${fin}). Ambas horas deben estar entre las ${inicio} y las ${fin} (hora de Ecuador) y la devolución debe ser `
+                + 'posterior a la entrega; puede ser el mismo día. Puedes enviar la solicitud a cualquier hora, por ejemplo en la noche para mañana a las 10:00. '
+                + 'La asociación no te entrega el recurso antes de la hora que pediste.'
+        },
+        enlaces: [{texto: 'Ver recursos', ruta: '/#recursos'}]
+    },
+    {
+        id: 'recordatorios',
+        titulo: '¿Me avisan antes de que venza mi préstamo?',
+        claves: ['recordatori', 'me avis', 'avisan', 'avisar', 'antes venc', 'antes de que venz', 'olvid devolv', 'olvid devuelv', 'record devolv'],
+        get respuesta() {
+            const horas = horasRecordatorio()
+            const lista = horas.length === 1 ? `${horas[0]}` : `${horas.slice(0, -1).join(', ')} y ${horas.at(-1)}`
+            return `Sí. PoliRent te envía un recordatorio automático ${lista} ${horas.length === 1 && horas[0] === 1 ? 'hora' : 'horas'} antes de la hora de devolución `
+                + 'de cada recurso que tienes en préstamo, con el nombre del recurso, el día y la hora. Lo ves en la campana de notificaciones y, si la asociación '
+                + `configuró el correo, también en tu correo institucional. Cada día o fracción de atraso genera una penalización del ${tarifas().atrasoPorDia} % del precio.`
+        },
+        enlaces: [{texto: 'Notificaciones', ruta: '/perfil?seccion=notificaciones'}]
     },
     {
         id: 'cancelar',
         titulo: '¿Cómo cancelo una solicitud?',
         claves: ['cancel', 'anul', 'ya no necesit', 'desist'],
-        respuesta: 'Entra a "Mis solicitudes", abre la solicitud y pulsa "Cancelar". Solo se pueden cancelar las solicitudes en revisión o aprobadas; '
-            + 'un recurso que ya te entregaron se devuelve en el punto de retiro.',
+        respuesta: 'Entra a "Mis solicitudes", abre la solicitud y pulsa "Cancelar". Solo se puede cancelar una solicitud pendiente (en revisión); '
+            + 'si ya fue aprobada, avisa a la asociación, y un recurso que ya te entregaron se devuelve en el punto de retiro.',
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
     },
     {
@@ -159,7 +190,7 @@ const PREGUNTAS_FRECUENTES = [
         get respuesta() {
             const {inicio, fin} = horario()
             return `La entrega y la devolución de los recursos solo se realizan entre las ${inicio} y las ${fin} (hora de Ecuador). `
-                + `Por eso la fecha de devolución que eliges al reservar se fija a las ${fin} de ese día. `
+                + `Las horas de entrega y devolución que eliges al reservar deben estar en ese horario; si eliges solo el día de devolución, se fija a las ${fin}. `
                 + 'Fuera de ese horario el responsable no puede registrar la entrega ni la devolución.'
         },
         enlaces: [{texto: 'Mis solicitudes', ruta: '/solicitudes'}]
@@ -255,7 +286,7 @@ const SENALES_FUERA_DE_TEMA = ['chiste', 'resuelv', 'resolv', 'traduc', 'redact'
 
 const SALUDOS = ['hola', 'buen', 'hey', 'saludo', 'gracias', 'ok', 'vale', 'que tal']
 
-const normalizarTexto = (texto) => String(texto ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+const normalizarTexto = (texto) => String(texto ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 const palabras = (texto) => normalizarTexto(texto).split(/[^a-z0-9]+/).filter(Boolean)
 
 // una parte terminada en $ debe ser la palabra completa (o su plural): "proyecto$" no coincide con "proyector"
@@ -388,4 +419,36 @@ const responderDeuda = (mensaje, resumen) => {
         + (atraso > 0 ? `, pero tu atraso actual acumula ${dolares(atraso)}: devuelve el recurso cuanto antes para que no siga aumentando.` : '.'), enlaces)
 }
 
-export {TIPOS_RESPUESTA, PREGUNTAS_FRECUENTES, RESPUESTA_FUERA_DE_TEMA, buscarPreguntaFrecuente, responderLocal, esPreguntaDeuda, responderDeuda}
+// el usuario pregunta cuantas solicitudes o recursos puede pedir (p. ej. "puedo pedir 4 recursos para hoy y otro para manana")
+const SENALES_SOLICITUDES = ['cuant solicitud', 'cuant recurs pued', 'cuant prest pued', 'cuant pued ped', 'cuant pued solicit', 'cuant pued reserv',
+    'cuant mas pued', 'maxim solicitud', 'limit solicitud', 'solicitudes activ', 'pued ped recursos$', 'pued solicit recursos$', 'pued reserv recursos$',
+    'varios recurs', 'mas de un recurs', 'a la vez', 'al mismo tiempo']
+
+const esPreguntaSolicitudes = (mensaje) => tieneSenal(SENALES_SOLICITUDES, mensaje)
+
+/**
+ * Respuesta a "¿cuántas solicitudes puedo hacer?".
+ * @param {string} mensaje
+ * @param {number | null} activas  solicitudes pendientes, aprobadas o entregadas del estudiante; null sin sesion de estudiante
+ * @returns {{tipo, respuesta, enlaces, recomendaciones, preguntaFrecuente, seguro} | null}  null si el mensaje no pregunta por esto
+ */
+const responderSolicitudesActivas = (mensaje, activas) => {
+    if (!esPreguntaSolicitudes(mensaje)) return null
+    const general = PREGUNTAS_FRECUENTES.find(p => p.id === 'maximo_solicitudes')
+    const respuesta = (texto, enlaces) => ({tipo: 'ayuda', respuesta: texto, enlaces, recomendaciones: [], preguntaFrecuente: 'maximo_solicitudes', seguro: true})
+    if (activas === null || activas === undefined) {
+        return respuesta(`${general.respuesta} Inicia sesión para ver cuántas te quedan.`, [{texto: 'Iniciar sesión', ruta: '/login'}])
+    }
+    const maximo = maxSolicitudesActivas()
+    const usadas = Math.max(0, Number(activas) || 0)
+    const quedan = Math.max(0, maximo - usadas)
+    const detalle = quedan > 0
+        ? ' Cada solicitud puede ser para hoy o para otro día: lo que cuenta es cuántas tienes activas al mismo tiempo (en revisión, aprobadas o en préstamo). '
+            + 'Recuerda que con penalizaciones pendientes o en revisión no puedes solicitar.'
+        : ' Llegaste al máximo: cancela una solicitud pendiente, espera la respuesta de la asociación o devuelve un recurso antes de pedir otro.'
+    return respuesta(`Tienes ${usadas} de ${maximo} solicitudes activas; puedes pedir ${quedan} recurso(s) mas.${detalle}`,
+        [{texto: 'Mis solicitudes', ruta: '/solicitudes'}, {texto: 'Ver recursos', ruta: '/#recursos'}])
+}
+
+export {TIPOS_RESPUESTA, PREGUNTAS_FRECUENTES, RESPUESTA_FUERA_DE_TEMA, buscarPreguntaFrecuente, responderLocal, esPreguntaDeuda, responderDeuda,
+    esPreguntaSolicitudes, responderSolicitudesActivas}

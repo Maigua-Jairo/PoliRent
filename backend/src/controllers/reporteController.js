@@ -3,7 +3,7 @@ import Recurso from '../models/Recurso.js'
 import Usuario from '../models/Usuario.js'
 import Penalizacion from '../models/Penalizacion.js'
 import {aCSV, rangoFechas} from '../helpers/reporteHelper.js'
-import {recursosParaReponer, resumenPenalizaciones} from '../helpers/metricasHelper.js'
+import {recursosParaReponer, resumenPenalizaciones, recaudado} from '../helpers/metricasHelper.js'
 
 const redondear = (x) => Math.round(x * 100) / 100
 // suma de las penalizaciones agrupadas por la clave indicada (prestamo o recurso)
@@ -40,7 +40,7 @@ const metricas = async (req, res) => {
             Recurso.find().select('nombre categoria estado').lean(),
             Prestamo.find().select('recurso estado createdAt fechaEntrega fechaDevolucion fechaDevolucionReal devolucion.condicion').lean(),
             Usuario.countDocuments({rol: 'estudiante'}),
-            Penalizacion.find().select('tipo estado monto').lean()
+            Penalizacion.find().select('tipo estado monto recurso').lean()
         ])
         const nombres = new Map(recursos.map(r => [String(r._id), r]))
         const usados = prestamos.filter(p => USADOS.includes(p.estado))
@@ -80,7 +80,8 @@ const metricas = async (req, res) => {
             },
             usoPorCategoria: contar(usados, p => nombres.get(String(p.recurso))?.categoria ?? 'sin_categoria'),
             masPrestados,
-            penalizaciones: resumenPenalizaciones(penalizaciones),
+            // recaudado: solo penalizaciones pagadas, por recurso y por tipo (porcentajes que suman 100)
+            penalizaciones: {...resumenPenalizaciones(penalizaciones), recaudado: recaudado(penalizaciones, nombres)},
             // recursos con alta demanda, danos, perdidas o en mantenimiento: candidatos a reponer o ampliar inventario
             recursosParaReponer: recursosParaReponer(recursos, prestamos, new Date(ahora))
         })
@@ -114,10 +115,11 @@ const reportePrestamos = async (req, res) => {
             recurso: p.recurso?.nombre ?? 'Recurso eliminado',
             categoria: p.recurso?.categoria ?? '',
             estado: p.estado,
-            motivo: p.motivo,
+            motivoPrestamo: p.motivo,
             solicitadoEl: p.createdAt,
-            fechaEntrega: p.fechaEntrega,
-            fechaDevolucion: p.fechaDevolucion,
+            fechaEntregaProgramada: p.fechaEntregaProgramada ?? null,
+            fechaEntregaReal: p.fechaEntrega,
+            fechaDevolucionProgramada: p.fechaDevolucion,
             fechaDevolucionReal: p.fechaDevolucionReal,
             docente: p.docenteReferencia?.nombre ?? '',
             correoDocente: p.docenteReferencia?.correo ?? '',
@@ -132,8 +134,9 @@ const reportePrestamos = async (req, res) => {
         const columnas = [
             {titulo: 'Estudiante', campo: 'estudiante'}, {titulo: 'Cedula', campo: 'cedula'}, {titulo: 'Correo', campo: 'correo'},
             {titulo: 'Facultad', campo: 'facultad'}, {titulo: 'Recurso', campo: 'recurso'}, {titulo: 'Categoria', campo: 'categoria'},
-            {titulo: 'Estado', campo: 'estado'}, {titulo: 'Motivo', campo: 'motivo'}, {titulo: 'Solicitado el', campo: 'solicitadoEl'},
-            {titulo: 'Entrega', campo: 'fechaEntrega'}, {titulo: 'Devolucion prevista', campo: 'fechaDevolucion'},
+            {titulo: 'Estado', campo: 'estado'}, {titulo: 'Motivo del prestamo', campo: 'motivoPrestamo'}, {titulo: 'Solicitado el', campo: 'solicitadoEl'},
+            {titulo: 'Entrega programada', campo: 'fechaEntregaProgramada'}, {titulo: 'Entrega real', campo: 'fechaEntregaReal'},
+            {titulo: 'Devolucion prevista', campo: 'fechaDevolucionProgramada'},
             {titulo: 'Devolucion real', campo: 'fechaDevolucionReal'},
             {titulo: 'Docente de referencia', campo: 'docente'}, {titulo: 'Correo del docente', campo: 'correoDocente'},
             {titulo: 'Telefono del docente', campo: 'telefonoDocente'}, {titulo: 'Entregado por', campo: 'entregadoPor'},
@@ -211,10 +214,11 @@ const reportePenalizaciones = async (req, res) => {
             recurso: p.recurso?.nombre ?? 'Recurso eliminado',
             tipo: TIPOS_TEXTO[p.tipo] ?? p.tipo,
             monto: p.monto,
-            dias: p.dias ?? '',
+            diasAtraso: p.dias ?? '',
             estado: p.estado,
             registradaEl: p.createdAt,
-            fechaPago: p.fechaPago,
+            fechaRegistro: p.createdAt,
+            fechaPago: p.fechaPago ?? null,
             motivoAnulacion: p.motivoAnulacion ?? '',
             comprobante: p.comprobante?.url ?? '',
             referencia: p.comprobante?.referencia ?? '',
@@ -223,8 +227,8 @@ const reportePenalizaciones = async (req, res) => {
         const columnas = [
             {titulo: 'Estudiante', campo: 'estudiante'}, {titulo: 'Cedula', campo: 'cedula'}, {titulo: 'Correo', campo: 'correo'},
             {titulo: 'Recurso', campo: 'recurso'}, {titulo: 'Tipo', campo: 'tipo'}, {titulo: 'Monto', campo: 'monto'},
-            {titulo: 'Dias', campo: 'dias'}, {titulo: 'Estado', campo: 'estado'}, {titulo: 'Registrada el', campo: 'registradaEl'},
-            {titulo: 'Fecha de pago', campo: 'fechaPago'}, {titulo: 'Motivo de anulacion', campo: 'motivoAnulacion'},
+            {titulo: 'Dias de atraso', campo: 'diasAtraso'}, {titulo: 'Estado', campo: 'estado'}, {titulo: 'Registrada el', campo: 'registradaEl'},
+            {titulo: 'Pagada el', campo: 'fechaPago'}, {titulo: 'Motivo de anulacion', campo: 'motivoAnulacion'},
             {titulo: 'Comprobante (URL)', campo: 'comprobante'}, {titulo: 'Referencia', campo: 'referencia'}, {titulo: 'Revisada el', campo: 'fechaRevision'}
         ]
         responderReporte(res, formato, 'reporte-penalizaciones', columnas, filas, {

@@ -52,7 +52,8 @@ describe('Asistente: motor local', () => {
         ['como me registro', 'registro'],
         ['olvide mi contraseña', 'olvide_clave'],
         ['como cancelo mi solicitud', 'cancelar'],
-        ['por que no puedo pedir otro recurso', 'prestamo_unico'],
+        // la regla "un prestamo a la vez" se reemplazo por un maximo de solicitudes activas
+        ['por que no puedo pedir otro recurso', 'maximo_solicitudes'],
         ['¿Qué es PoliRent?', 'que_es']
     ])('"%s" es ayuda (%s)', (mensaje, id) => {
         const r = local(mensaje)
@@ -110,13 +111,24 @@ describe('POST /api/asistente', () => {
         expect(res.body.recomendaciones[0]).toMatchObject({recurso: {nombre: 'Kit Arduino Uno', categoria: 'tecnico'}, relevancia: 100, razon: expect.any(String)})
     })
 
-    test('a un estudiante con un prestamo activo le recuerda la regla de un prestamo a la vez', async () => {
+    // antes recordaba "un prestamo a la vez" con cualquier prestamo activo; ahora solo al llegar al maximo de solicitudes
+    test('a un estudiante en el maximo de solicitudes activas le recuerda el limite', async () => {
         jest.spyOn(Usuario, 'findById').mockReturnValue({select: () => Promise.resolve(ESTUDIANTE)})
         simularActivo({_id: 'p1', estado: 'entregado', recurso: {_id: 'r1', nombre: 'Laptop Dell'}})
+        jest.spyOn(Prestamo, 'countDocuments').mockResolvedValue(5)
         const res = await preguntar({mensaje: 'necesito algo para una exposicion'}, crearTokenJWT(ESTUDIANTE._id, 'estudiante'))
         expect(res.body.tipo).toBe('recomendacion')
         expect(res.body.prestamoActivo).toMatchObject({estado: 'entregado', recurso: {nombre: 'Laptop Dell'}})
-        expect(res.body.respuesta).toMatch(/préstamo en curso \(Laptop Dell\)/)
+        expect(res.body.respuesta).toMatch(/ya tienes 5 solicitudes activas, el máximo permitido \(5\)/)
+    })
+
+    test('con un prestamo activo pero bajo el maximo no agrega el aviso', async () => {
+        jest.spyOn(Usuario, 'findById').mockReturnValue({select: () => Promise.resolve(ESTUDIANTE)})
+        simularActivo({_id: 'p1', estado: 'entregado', recurso: {_id: 'r1', nombre: 'Laptop Dell'}})
+        jest.spyOn(Prestamo, 'countDocuments').mockResolvedValue(1)
+        const res = await preguntar({mensaje: 'necesito algo para una exposicion'}, crearTokenJWT(ESTUDIANTE._id, 'estudiante'))
+        expect(res.body.tipo).toBe('recomendacion')
+        expect(res.body.respuesta).not.toMatch(/máximo permitido/)
     })
 
     test('un token invalido responde 401 como el resto de rutas', async () => {

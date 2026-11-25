@@ -134,20 +134,22 @@ describe('Recursos: etiquetas e imagen como texto', () => {
     beforeEach(() => sesion(ADMIN))
     const crear = (cuerpo) => request(app).post('/api/recursos').set('Authorization', token(ADMIN)).send({nombre: 'Proyector', categoria: 'academico', ...cuerpo})
 
+    // limites nuevos (revision de la tesis): maximo 15 etiquetas, de 2 a 30 caracteres y sin repetir; cada error nombra el problema
     test.each([
-        [{etiquetas: {$ne: null}}],
-        [{etiquetas: [{a: 1}]}],
-        [{etiquetas: Array.from({length: 11}, (_, i) => `etiqueta${i}`)}],
-        [{etiquetas: ['x']}],
-        [{etiquetas: ['a'.repeat(31)]}]
-    ])('rechaza etiquetas invalidas %j (400)', async (cuerpo) => {
+        [{etiquetas: {$ne: null}}, 'Las etiquetas del recurso deben ser una lista de textos o un texto separado por comas'],
+        [{etiquetas: [{a: 1}]}, 'Las etiquetas del recurso deben ser una lista de textos o un texto separado por comas'],
+        [{etiquetas: Array.from({length: 16}, (_, i) => `etiqueta${i}`)}, 'El recurso puede tener maximo 15 etiquetas'],
+        [{etiquetas: ['x']}, 'Cada etiqueta del recurso debe tener entre 2 y 30 caracteres'],
+        [{etiquetas: ['a'.repeat(31)]}, 'Cada etiqueta del recurso debe tener entre 2 y 30 caracteres'],
+        [{etiquetas: ['Robotica', 'robótica']}, 'Las etiquetas del recurso no pueden repetirse']
+    ])('rechaza etiquetas invalidas %j (400)', async (cuerpo, msg) => {
         const res = await crear(cuerpo)
         expect(res.status).toBe(400)
-        expect(res.body.msg).toBe('Las etiquetas deben ser una lista de maximo 10 textos de 2 a 30 caracteres')
+        expect(res.body.msg).toBe(msg)
     })
 
     test('acepta etiquetas validas como texto separado por comas (multipart)', async () => {
-        jest.spyOn(Recurso, 'findOne').mockResolvedValue(null)
+        jest.spyOn(Recurso, 'findOne').mockReturnValue(consulta(null))
         jest.spyOn(Recurso, 'create').mockImplementation(async (datos) => datos)
         const res = await request(app).post('/api/recursos').set('Authorization', token(ADMIN))
             .field('nombre', 'Proyector').field('categoria', 'academico').field('etiquetas', 'proyector, presentacion')
@@ -253,7 +255,9 @@ describe('Asignacion masiva', () => {
     test('la solicitud de prestamo ignora usuario, estado y codigoQR del cuerpo', async () => {
         sesion(ESTUDIANTE)
         jest.spyOn(Recurso, 'findById').mockResolvedValue({_id: ID, nombre: 'Proyector', estado: 'disponible'})
-        jest.spyOn(Prestamo, 'findOne').mockReturnValue(consulta(null))
+        // regla de maximo de solicitudes activas: 0 activas
+        jest.spyOn(Prestamo, 'countDocuments').mockResolvedValue(0)
+        jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([]))
         jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([]))
         jest.spyOn(Usuario, 'find').mockReturnValue({select: () => Promise.resolve([])})
         jest.spyOn(Prestamo, 'create').mockImplementation(async (datos) => ({_id: 'p1', ...datos}))
@@ -350,7 +354,7 @@ describe('Swagger al dia', () => {
 
     test('las restricciones de etiquetas e imagen coinciden con la validacion', () => {
         const put = especificacion.paths['/api/recursos/{id}'].put.requestBody.content['application/json'].schema.properties
-        expect(put.etiquetas).toMatchObject({maxItems: 10, items: {minLength: 2, maxLength: 30}})
+        expect(put.etiquetas).toMatchObject({maxItems: 15, uniqueItems: true, items: {minLength: 2, maxLength: 30}})
         expect(put.imagen.maxLength).toBe(500)
         expect(especificacion.components.schemas.Recurso.properties.imagenId).toBeUndefined()
     })

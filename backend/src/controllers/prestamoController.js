@@ -1,11 +1,12 @@
-import Prestamo, {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, mensajePrestamoActivo} from '../models/Prestamo.js'
+import Prestamo, {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, mensajeMaximoSolicitudes} from '../models/Prestamo.js'
 import Recurso from '../models/Recurso.js'
 import Penalizacion from '../models/Penalizacion.js'
 import {generarCodigoQR, generarImagenQR} from '../helpers/qrHelper.js'
 import {notificar, notificarAdministradores, formatearFecha} from '../helpers/notificacionHelper.js'
 import {rangoFechas} from '../helpers/reporteHelper.js'
-import {TERMINOS_VERSION, horarioActivo, dentroDeHorario, mensajeHorario, calcularPenalizaciones} from '../helpers/politicasHelper.js'
+import {TERMINOS_VERSION, horarioActivo, dentroDeHorario, mensajeHorario, calcularPenalizaciones, toleranciaEntregaMin, formatearFechaHora, maxSolicitudesActivas} from '../helpers/politicasHelper.js'
 import {deudaPenalizaciones, formatoDolares} from '../helpers/penalizacionHelper.js'
+import {datosPenalizacion} from './penalizacionController.js'
 import {cloudinaryConfigurado, subirImagen, eliminarImagen} from '../config/cloudinary.js'
 import {MSG_CONFLICTO, esConflictoVersion} from '../helpers/responseHelper.js'
 
@@ -14,12 +15,14 @@ const CAMPOS_RECURSO = 'nombre categoria estado imagen precio'
 const MSG_SIN_CLOUDINARY = 'La subida de imagenes no esta disponible: falta configurar Cloudinary'
 const CONDICIONES_CON_EVIDENCIA = ['danado', 'incompleto']
 
-// entrega o devolucion registrada (sin el publicId de la evidencia en cloudinary)
-const datosMovimiento = (m) => {
+// entrega o devolucion registrada (sin el publicId de la evidencia en cloudinary).
+// `nombrePersona`: entregadoPor (quien entrego el recurso al estudiante) o recibidoPor (quien lo recibio de vuelta).
+// En la base de datos se sigue guardando como responsableNombre
+const datosMovimiento = (m, nombrePersona) => {
     if(!m?.responsableNombre) return null
     return {
-        responsable: m.responsable,
-        responsableNombre: m.responsableNombre,
+        registradoPor: m.responsable,
+        [nombrePersona]: m.responsableNombre,
         observaciones: m.observaciones ?? '',
         ...(m.condicion ? {condicion: m.condicion} : {}),
         evidencia: m.evidencia?.url ? {url: m.evidencia.url} : null
@@ -30,17 +33,19 @@ const datosMovimiento = (m) => {
 const datosPrestamo = (p) => ({
     _id: p._id,
     estado: p.estado,
-    motivo: p.motivo,
-    fechaDevolucion: p.fechaDevolucion,
-    fechaEntrega: p.fechaEntrega,
+    // nombres claros en la API; en la base de datos siguen siendo motivo, fechaDevolucion y fechaEntrega
+    motivoPrestamo: p.motivo,
+    fechaEntregaProgramada: p.fechaEntregaProgramada ?? null,
+    fechaDevolucionProgramada: p.fechaDevolucion,
+    fechaEntregaReal: p.fechaEntrega,
     fechaDevolucionReal: p.fechaDevolucionReal,
     motivoRechazo: p.motivoRechazo,
     terminos: p.terminos?.version ? {version: p.terminos.version, aceptadoEn: p.terminos.aceptadoEn} : null,
     docenteReferencia: p.docenteReferencia?.nombre
         ? {nombre: p.docenteReferencia.nombre, correo: p.docenteReferencia.correo, telefono: p.docenteReferencia.telefono ?? ''}
         : null,
-    entrega: datosMovimiento(p.entrega),
-    devolucion: datosMovimiento(p.devolucion),
+    entrega: datosMovimiento(p.entrega, 'entregadoPor'),
+    devolucion: datosMovimiento(p.devolucion, 'recibidoPor'),
     usuario: p.usuario,
     recurso: p.recurso,
     createdAt: p.createdAt,
@@ -54,21 +59,19 @@ const responderError = (res, error, texto) => esConflictoVersion(error)
     ? res.status(400).json({msg: MSG_CONFLICTO})
     : res.status(500).json({msg: `${texto} - ${error}`})
 
-// HU-007: solicitar un prestamo (la fecha ya llega normalizada por validarSolicitudPrestamo)
+// HU-007: solicitar un prestamo (las fechas de entrega y devolucion ya llegan normalizadas por validarSolicitudPrestamo)
 const solicitarPrestamo = async (req, res) => {
-    const {recursoId, fechaDevolucion, motivo, docenteReferencia} = req.body
+    const {recursoId, fechaDevolucion, fechaEntregaProgramada, motivoPrestamo, docenteReferencia} = req.body
     try{
         const recurso = await Recurso.findById(recursoId)
         if(!recurso){
             return res.status(404).json({msg: 'Recurso no encontrado'})
         }
-        // un solo prestamo a la vez: cualquier solicitud pendiente, aprobada o entregada bloquea otra nueva
-        const activa = await Prestamo.findOne({
-            usuario: req.usuarioHeader._id,
-            estado: {$in: ESTADOS_ACTIVOS}
-        }).populate('recurso', 'nombre')
-        if(activa){
-            return res.status(400).json({msg: mensajePrestamoActivo(activa.estado, activa.recurso?.nombre)})
+        // maximo de MAX_SOLICITUDES_ACTIVAS solicitudes pendientes, aprobadas o entregadas a la vez
+        const maximo = maxSolicitudesActivas()
+        const filtroActivas = {usuario: req.usuarioHeader._id, estado: {$in: ESTADOS_ACTIVOS}}
+        if(await Prestamo.countDocuments(filtroActivas) >= maximo){
+            return res.status(400).json({msg: mensajeMaximoSolicitudes(maximo)})
         }
         // con penalizaciones pendientes o en revision (comprobante sin confirmar) no puede solicitar otro recurso
         const deuda = await deudaPenalizaciones(req.usuarioHeader._id)
@@ -83,8 +86,9 @@ const solicitarPrestamo = async (req, res) => {
         const prestamo = await Prestamo.create({
             usuario: req.usuarioHeader._id,
             recurso: recurso._id,
+            fechaEntregaProgramada: new Date(fechaEntregaProgramada),
             fechaDevolucion: new Date(fechaDevolucion),
-            motivo: motivo?.trim(),
+            motivo: motivoPrestamo?.trim(),
             terminos: {version: TERMINOS_VERSION, aceptadoEn: new Date()},
             docenteReferencia: {
                 nombre: docenteReferencia.nombre.trim(),
@@ -92,6 +96,13 @@ const solicitarPrestamo = async (req, res) => {
                 telefono: typeof docenteReferencia.telefono === 'string' ? docenteReferencia.telefono.trim() : ''
             }
         })
+        // dos solicitudes simultaneas del mismo estudiante pueden pasar el conteo a la vez: se vuelve a contar ya creada.
+        // Se conservan las `maximo` mas antiguas (mismo orden por createdAt y _id para ambas peticiones) y la sobrante se borra
+        const vigentes = await Prestamo.find(filtroActivas).select('_id').sort({createdAt: 1, _id: 1}).lean()
+        if(vigentes.findIndex(p => String(p._id) === String(prestamo._id)) >= maximo){
+            await Prestamo.deleteOne({_id: prestamo._id})
+            return res.status(400).json({msg: mensajeMaximoSolicitudes(maximo)})
+        }
         // HU-010: se avisa a los administradores que hay una solicitud pendiente de revision
         notificarAdministradores('solicitud_nueva', `${req.usuarioHeader.nombres} ${req.usuarioHeader.apellidos} solicito "${recurso.nombre}".`, prestamo._id)
         res.status(201).json({msg: 'Solicitud de prestamo enviada correctamente', prestamo: datosPrestamo(prestamo)})
@@ -134,20 +145,26 @@ const detallePrestamo = async (req, res) => {
     }
 }
 
-// HU-007: cancelar una solicitud pendiente o aprobada
+// HU-007: el estudiante cancela una solicitud que aun esta pendiente (una aprobada ya no se cancela)
 const cancelarPrestamo = async (req, res) => {
     try{
         const prestamo = await Prestamo.findById(req.params.id)
         if(!prestamo || !esDelUsuario(prestamo, req.usuarioHeader)){
             return res.status(404).json({msg: 'Solicitud no encontrada'})
         }
-        if(!['pendiente', 'aprobado'].includes(prestamo.estado)){
-            return res.status(400).json({msg: `No se puede cancelar una solicitud ${prestamo.estado}`})
+        if(prestamo.estado !== 'pendiente'){
+            return res.status(400).json({msg: 'Solo se puede cancelar una solicitud pendiente'})
         }
         prestamo.estado = 'cancelado'
         prestamo.codigoQR = undefined
         await prestamo.save()
-        res.status(200).json({msg: 'Solicitud cancelada correctamente', prestamo: datosPrestamo(prestamo)})
+        const recurso = await Recurso.findById(prestamo.recurso, 'nombre')
+        // un prestamo cancelado nunca se entrego: la respuesta no lleva datos de devolucion
+        const {fechaDevolucionProgramada, fechaDevolucionReal, devolucion, ...datos} = datosPrestamo(prestamo)
+        res.status(200).json({msg: 'Solicitud cancelada correctamente', prestamo: {
+            ...datos,
+            recurso: recurso ? {_id: recurso._id, nombre: recurso.nombre} : prestamo.recurso
+        }})
     }catch(error){
         responderError(res, error, 'Error al cancelar la solicitud')
     }
@@ -222,7 +239,7 @@ const aprobarPrestamo = async (req, res) => {
 
 // HU-003: rechazar una solicitud
 const rechazarPrestamo = async (req, res) => {
-    const {motivo} = req.body
+    const {motivoRechazo} = req.body
     try{
         const prestamo = await Prestamo.findById(req.params.id)
         if(!prestamo){
@@ -232,7 +249,7 @@ const rechazarPrestamo = async (req, res) => {
             return res.status(400).json({msg: `No se puede rechazar una solicitud ${prestamo.estado}`})
         }
         prestamo.estado = 'rechazado'
-        prestamo.motivoRechazo = motivo?.trim() ?? ''
+        prestamo.motivoRechazo = motivoRechazo
         await prestamo.save()
         const recurso = await Recurso.findById(prestamo.recurso).select('nombre')
         notificar(prestamo.usuario, 'rechazado', `Tu solicitud de "${recurso?.nombre ?? 'el recurso'}" fue rechazada.${prestamo.motivoRechazo ? ` Motivo: ${prestamo.motivoRechazo}` : ''}`, prestamo._id)
@@ -274,6 +291,13 @@ const registrarMovimiento = async (req, res, prestamo, esperada = null) => {
     }
     if(!accion){
         return res.status(400).json({msg: `La solicitud esta ${prestamo.estado}`})
+    }
+    // no se entrega antes de la hora programada (menos ENTREGA_TOLERANCIA_MIN); las solicitudes antiguas no la tienen
+    if(accion === 'entrega' && prestamo.fechaEntregaProgramada){
+        const programada = new Date(prestamo.fechaEntregaProgramada)
+        if(Date.now() < programada.getTime() - toleranciaEntregaMin() * 60 * 1000){
+            return res.status(400).json({msg: `Esta solicitud esta programada para el ${formatearFechaHora(programada)}, no se puede entregar antes`})
+        }
     }
     const condicion = req.body.condicion || 'bueno'
     if(accion === 'devolucion' && CONDICIONES_CON_EVIDENCIA.includes(condicion) && !req.file){
@@ -349,9 +373,10 @@ const registrarMovimiento = async (req, res, prestamo, esperada = null) => {
             : []
         const advertencias = calculo.sinPrecio ? ['El recurso no tiene precio registrado: no se generaron penalizaciones'] : []
 
+        // responsableNombre de la devolucion es quien recibe el recurso de vuelta
         notificar(prestamo.usuario, 'devuelto', condicion === 'perdido'
-            ? `Se registro la perdida de "${recurso.nombre}".`
-            : `Se registro la devolucion de "${recurso.nombre}". Gracias por devolverlo.`, prestamo._id)
+            ? `Se registro la perdida de "${recurso.nombre}". La registro ${movimiento.responsableNombre}.`
+            : `Se registro la devolucion de "${recurso.nombre}". Lo recibio ${movimiento.responsableNombre}. Gracias por devolverlo.`, prestamo._id)
         if(calculo.penalizaciones.length){
             const detalle = calculo.penalizaciones.map(p => `${p.descripcion}: ${formatoDolares(p.monto)}`).join('; ')
             notificar(prestamo.usuario, 'penalizacion', `Se registraron penalizaciones por "${recurso.nombre}": ${detalle}. Total: ${formatoDolares(calculo.total)}. `
@@ -362,7 +387,8 @@ const registrarMovimiento = async (req, res, prestamo, esperada = null) => {
             accion,
             prestamo: datosPrestamo(prestamo),
             recurso: {_id: recurso._id, nombre: recurso.nombre, estado: recurso.estado},
-            penalizaciones,
+            // mismo formato que GET /api/penalizaciones (diasAtraso, fechaRegistro, fechaPago...)
+            penalizaciones: penalizaciones.map(datosPenalizacion),
             totalPenalizado: calculo.total,
             advertencias
         })

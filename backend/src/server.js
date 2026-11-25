@@ -11,6 +11,7 @@ import reporteRouter from './routers/reporteRouter.js'
 import usuarioRouter from './routers/usuarioRouter.js'
 import penalizacionRouter from './routers/penalizacionRouter.js'
 import {rutaNoEncontrada, manejarErrores} from './middlewares/errorHandler.js'
+import {recordatoriosOportunistas} from './helpers/recordatorioHelper.js'
 import swaggerUi from 'swagger-ui-express'
 import especificacion from './docs/openapi.js'
 
@@ -24,6 +25,8 @@ app.use(cors({origin: origenes?.length ? origenes : true}))
 if(process.env.NODE_ENV !== 'test') app.use(morgan('dev'))
 // limite explicito del cuerpo JSON; uno mayor responde 400 (ver manejarErrores)
 app.use(express.json({limit: '100kb'}))
+// recordatorios de devolucion: revision oportunista en las peticiones (Render duerme el servicio gratuito)
+app.use(recordatoriosOportunistas)
 
 app.get('/',(req, res)=>{
     res.json({

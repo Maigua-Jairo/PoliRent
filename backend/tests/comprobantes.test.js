@@ -222,24 +222,24 @@ describe('Revision del administrador', () => {
         penalizacion.estado = 'en_revision'
         const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({})
         expect(res.status).toBe(400)
-        expect(res.body.msg).toBe('El motivo del rechazo debe tener entre 3 y 200 caracteres')
+        expect(res.body.msg).toBe('El motivo del rechazo del comprobante debe tener entre 3 y 200 caracteres')
     })
 
-    test.each([[{motivo: 'ok'}], [{motivo: {$ne: null}}], [{motivo: ['La foto no se lee']}]])('el rechazo valida el motivo (%j)', async (cuerpo) => {
+    test.each([[{motivoRechazoComprobante: 'ok'}], [{motivoRechazoComprobante: {$ne: null}}], [{motivoRechazoComprobante: ['La foto no se lee']}], [{motivo: 'La foto no se lee'}]])('el rechazo valida el motivo (%j)', async (cuerpo) => {
         penalizacion.estado = 'en_revision'
         const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send(cuerpo)
         expect(res.status).toBe(400)
     })
 
     test('no se puede rechazar el comprobante de una pendiente', async () => {
-        const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivo: 'La foto no se lee'})
+        const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivoRechazoComprobante: 'La foto no se lee'})
         expect(res.status).toBe(400)
         expect(res.body.msg).toBe('Solo se puede rechazar el comprobante de una penalizacion en revision')
     })
 
     test('el rechazo devuelve a pendiente, borra la imagen y notifica el motivo', async () => {
         penalizacion = nuevaPenalizacion({estado: 'en_revision', comprobante: {url: 'https://res.cloudinary.com/c.png', publicId: 'polirent/comprobantes/c9'}})
-        const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivo: ' La foto no se lee '})
+        const res = await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivoRechazoComprobante: ' La foto no se lee '})
         expect(res.status).toBe(200)
         expect(res.body.penalizacion).toMatchObject({estado: 'pendiente', comprobante: null, motivoRechazoComprobante: 'La foto no se lee', fechaRevision: expect.any(String)})
         expect(cloudinary.uploader.destroy).toHaveBeenCalledWith('polirent/comprobantes/c9')
@@ -248,7 +248,7 @@ describe('Revision del administrador', () => {
 
     test('despues de un rechazo el estudiante puede volver a subir otro comprobante', async () => {
         penalizacion = nuevaPenalizacion({estado: 'en_revision', comprobante: {url: 'u', publicId: 'p'}})
-        await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivo: 'Monto incorrecto'})
+        await request(app).put(`/api/penalizaciones/${ID}/rechazar-comprobante`).set('Authorization', token(ADMIN)).send({motivoRechazoComprobante: 'Monto incorrecto'})
         sesion(ESTUDIANTE)
         const res = await conArchivo(enviar())
         expect(res.status).toBe(200)
@@ -257,12 +257,12 @@ describe('Revision del administrador', () => {
 
     test('anular desde en_revision funciona', async () => {
         penalizacion.estado = 'en_revision'
-        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivo: 'El estudiante repuso el articulo'})
+        const res = await request(app).put(`/api/penalizaciones/${ID}/anular`).set('Authorization', token(ADMIN)).send({motivoAnulacion: 'El estudiante repuso el articulo'})
         expect(res.status).toBe(200)
         expect(res.body.penalizacion.estado).toBe('anulada')
     })
 
-    test.each([['pagar', {}, 'Solo se pueden pagar penalizaciones pendientes o en revision'], ['anular', {motivo: 'Otra vez'}, 'Solo se pueden anular penalizaciones pendientes o en revision']])(
+    test.each([['pagar', {}, 'Solo se pueden pagar penalizaciones pendientes o en revision'], ['anular', {motivoAnulacion: 'Otra vez'}, 'Solo se pueden anular penalizaciones pendientes o en revision']])(
         'no se puede %s dos veces', async (accion, cuerpo, msg) => {
             penalizacion.estado = accion === 'pagar' ? 'pagada' : 'anulada'
             const res = await request(app).put(`/api/penalizaciones/${ID}/${accion}`).set('Authorization', token(ADMIN)).send(cuerpo)
@@ -321,7 +321,9 @@ describe('La penalizacion en revision sigue siendo deuda', () => {
         process.env.VALIDAR_HORARIO = 'false'
         sesion(ESTUDIANTE)
         jest.spyOn(Recurso, 'findById').mockResolvedValue({_id: 'r1', nombre: 'Proyector', estado: 'disponible'})
-        jest.spyOn(Prestamo, 'findOne').mockReturnValue(consulta(null))
+        // regla de maximo de solicitudes activas: 0 activas
+        jest.spyOn(Prestamo, 'countDocuments').mockResolvedValue(0)
+        jest.spyOn(Prestamo, 'find').mockReturnValue(consulta([]))
         jest.spyOn(Prestamo, 'create').mockResolvedValue({})
         jest.spyOn(Penalizacion, 'find').mockReturnValue(consulta([{monto: 12.5, estado: 'en_revision'}]))
         const res = await request(app).post('/api/prestamos').set('Authorization', token(ESTUDIANTE)).send({
@@ -350,7 +352,8 @@ describe('Swagger del comprobante', () => {
         const subida = especificacion.paths['/api/penalizaciones/{id}/comprobante'].put
         expect(subida.requestBody.content['multipart/form-data'].schema.properties.comprobante).toMatchObject({type: 'string', format: 'binary'})
         expect(Object.keys(subida.responses)).toEqual(expect.arrayContaining(['200', '400', '401', '403', '404', '503']))
-        expect(especificacion.paths['/api/penalizaciones/{id}/rechazar-comprobante'].put.requestBody.content['application/json'].schema.required).toEqual(['motivo'])
+        // el campo se renombro de motivo a motivoRechazoComprobante
+        expect(especificacion.paths['/api/penalizaciones/{id}/rechazar-comprobante'].put.requestBody.content['application/json'].schema.required).toEqual(['motivoRechazoComprobante'])
         expect(especificacion.components.schemas.Penalizacion.properties.estado.enum).toContain('en_revision')
         expect(especificacion.components.schemas.Penalizacion.properties.comprobante.properties.publicId).toBeUndefined()
     })

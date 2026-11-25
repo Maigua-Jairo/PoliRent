@@ -1,22 +1,31 @@
 import Recurso from '../models/Recurso.js'
+import Prestamo, { ESTADOS_ACTIVOS } from '../models/Prestamo.js'
 import { cloudinaryConfigurado, subirImagen, eliminarImagen } from '../config/cloudinary.js'
 
 const MSG_SIN_CLOUDINARY = 'La subida de imagenes no esta disponible: falta configurar Cloudinary'
+const MSG_NOMBRE_REPETIDO = 'Ya existe un recurso con ese nombre'
+// compara sin distinguir mayusculas ni tildes ("Balon de voley" = "balón de vóley"); no crea indices nuevos
+const SIN_MAYUSCULAS_NI_TILDES = { locale: 'es', strength: 1 }
+
+// otro recurso (distinto de `excluirId`) con el mismo nombre
+const nombreRepetido = (nombre, excluirId = null) => Recurso
+    .findOne({ nombre, ...(excluirId ? { _id: { $ne: excluirId } } : {}) })
+    .collation(SIN_MAYUSCULAS_NI_TILDES)
 
 // admite arreglo (JSON) o texto separado por comas (multipart/form-data)
 const listaEtiquetas = (valor) => {
     if (valor === undefined) return undefined
     const lista = Array.isArray(valor) ? valor : String(valor).split(',')
-    return lista.map(e => String(e).trim()).filter(Boolean)
+    return lista.map(e => String(e).trim().replace(/\s+/g, ' ')).filter(Boolean)
 }
 
 //  registrar un recurso
 const crearRecurso = async (req, res) => {
     const { nombre, descripcion, categoria, estado, imagen, etiquetas, precio } = req.body
     try {
-        const existe = await Recurso.findOne({ nombre: nombre.trim(), categoria })
-        if (existe) {
-            return res.status(400).json({ msg: 'Ya existe un recurso con ese nombre en la categoria' })
+        // el nombre ya llega sin espacios sobrantes (validarRecurso)
+        if (await nombreRepetido(nombre)) {
+            return res.status(400).json({ msg: MSG_NOMBRE_REPETIDO })
         }
         let imagenSubida = null
         if (req.file) {
@@ -26,7 +35,7 @@ const crearRecurso = async (req, res) => {
             imagenSubida = await subirImagen(req.file.buffer)
         }
         const recurso = await Recurso.create({
-            nombre: nombre.trim(),
+            nombre,
             descripcion: descripcion?.trim(),
             categoria,
             etiquetas: listaEtiquetas(etiquetas),
@@ -97,16 +106,12 @@ const actualizarRecurso = async (req, res) => {
         if (!recurso) {
             return res.status(404).json({ msg: 'Recurso no encontrado' })
         }
-        const nuevoNombre = nombre !== undefined ? nombre.trim() : recurso.nombre
-        const nuevaCategoria = categoria !== undefined ? categoria : recurso.categoria
-        if (nuevoNombre !== recurso.nombre || nuevaCategoria !== recurso.categoria) {
-            const repetido = await Recurso.findOne({ nombre: nuevoNombre, categoria: nuevaCategoria, _id: { $ne: recurso._id } })
-            if (repetido) {
-                return res.status(400).json({ msg: 'Ya existe un recurso con ese nombre en la categoria' })
-            }
+        // mismo criterio que al crear; se excluye al propio recurso para poder guardarlo con su mismo nombre
+        if (nombre !== undefined && await nombreRepetido(nombre, recurso._id)) {
+            return res.status(400).json({ msg: MSG_NOMBRE_REPETIDO })
         }
-        recurso.nombre = nuevoNombre
-        recurso.categoria = nuevaCategoria
+        if (nombre !== undefined) recurso.nombre = nombre
+        if (categoria !== undefined) recurso.categoria = categoria
         if (descripcion !== undefined) recurso.descripcion = descripcion.trim()
         if (estado !== undefined) recurso.estado = estado
         if (etiquetas !== undefined) recurso.etiquetas = listaEtiquetas(etiquetas)
@@ -134,15 +139,18 @@ const actualizarRecurso = async (req, res) => {
     }
 }
 
-// eliminar un recurso (no se elimina si esta prestado)
+// eliminar un recurso: solo si esta disponible y sin solicitudes activas (pendiente, aprobado o entregado)
 const eliminarRecurso = async (req, res) => {
     try {
         const recurso = await Recurso.findById(req.params.id)
         if (!recurso) {
             return res.status(404).json({ msg: 'Recurso no encontrado' })
         }
-        if (recurso.estado === 'prestado') {
-            return res.status(400).json({ msg: 'No se puede eliminar un recurso que esta prestado' })
+        if (recurso.estado !== 'disponible') {
+            return res.status(400).json({ msg: 'Solo se puede eliminar un recurso disponible' })
+        }
+        if (await Prestamo.exists({ recurso: recurso._id, estado: { $in: ESTADOS_ACTIVOS } })) {
+            return res.status(400).json({ msg: 'No se puede eliminar un recurso con solicitudes activas (pendientes, aprobadas o entregadas)' })
         }
         await recurso.deleteOne()
         await eliminarImagen(recurso.imagenId)

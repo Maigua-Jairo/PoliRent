@@ -2,6 +2,7 @@ import './config/environment.js'
 import app from './server.js'
 import conectarBaseDatos from './config/database.js'
 import {configurarCloudinary, cloudinaryConfigurado} from './config/cloudinary.js'
+import {iniciarRecordatorios} from './helpers/recordatorioHelper.js'
 
 const PORT = process.env.PORT || 4000
 
@@ -13,6 +14,8 @@ const iniciar = async () => {
     }
     app.listen(PORT, ()=>{
         console.log(`Servidor Poli Rent corriendo en el puerto ${PORT}`)
+        // recordatorios automaticos de devolucion (no en NODE_ENV=test)
+        iniciarRecordatorios()
     })
 }
 

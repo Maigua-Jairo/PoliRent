@@ -25,6 +25,40 @@ const aMinutos = (hhmm) => {
 }
 const redondear = (x) => Math.round(x * 100) / 100
 
+// entero >= minimo leido de una variable de entorno (si no es valido, el valor por defecto)
+const enteroEntorno = (nombre, defecto, minimo = 0) => {
+    const valor = numeroEntorno(nombre, defecto)
+    return Number.isInteger(valor) && valor >= minimo ? valor : defecto
+}
+
+// maximo de solicitudes activas (pendiente, aprobado o entregado) que un estudiante puede tener a la vez
+const maxSolicitudesActivas = () => enteroEntorno('MAX_SOLICITUDES_ACTIVAS', 5, 1)
+
+// longitud permitida del motivo con el que el administrador rechaza una solicitud
+const limitesMotivoRechazo = () => {
+    const min = enteroEntorno('MOTIVO_RECHAZO_MIN', 30, 1)
+    const max = enteroEntorno('MOTIVO_RECHAZO_MAX', 200, 1)
+    return max >= min ? {min, max} : {min: 30, max: 200}
+}
+
+// minutos antes de la hora programada en los que ya se puede registrar la entrega
+const toleranciaEntregaMin = () => enteroEntorno('ENTREGA_TOLERANCIA_MIN', 30)
+
+// dias maximos de anticipacion con los que se puede programar la entrega
+const reservaMaxDiasAnticipacion = () => enteroEntorno('RESERVA_MAX_DIAS_ANTICIPACION', 30)
+
+// horas antes de la devolucion en las que se envia un recordatorio (de mayor a menor, sin repetidas)
+const horasRecordatorio = () => {
+    const texto = process.env.RECORDATORIO_HORAS_ANTES
+    const lista = typeof texto === 'string' && texto.trim()
+        ? texto.split(',').map(h => Number(h.trim())).filter(h => Number.isFinite(h) && h > 0)
+        : []
+    return [...new Set(lista.length ? lista : [24, 1])].sort((a, b) => b - a)
+}
+
+// cada cuantos minutos se revisan los recordatorios de devolucion
+const intervaloRecordatorioMin = () => enteroEntorno('RECORDATORIO_INTERVALO_MIN', 15, 1)
+
 // tarifas en porcentaje del precio del recurso
 const tarifas = () => ({
     atrasoPorDia: numeroEntorno('PENALIZACION_ATRASO_DIA', 5),
@@ -67,6 +101,24 @@ const mensajeHorario = () => {
 // fecha AAAA-MM-DD de un instante en hora de Ecuador
 const fechaEcuador = (fecha) => new Intl.DateTimeFormat('en-CA', {timeZone: ZONA_HORARIA, year: 'numeric', month: '2-digit', day: '2-digit'})
     .format(new Date(fecha))
+
+// "AAAA-MM-DD" de un dia que existe (descarta 2026-02-31)
+const esFechaISO = (texto) => typeof texto === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(texto)
+    && !Number.isNaN(Date.parse(texto)) && new Date(texto).toISOString().slice(0, 10) === texto
+// "HH:mm" de 00:00 a 23:59
+const esHora = (texto) => typeof texto === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(texto)
+// dia "AAAA-MM-DD" a la hora "HH:mm" de Ecuador
+const combinarFechaHora = (fecha, hora) => new Date(`${fecha}T${hora}:00${DESFASE_ECUADOR}`)
+// "AAAA-MM-DD" del dia siguiente a `fecha` en Ecuador
+const diaSiguiente = (fecha) => fechaEcuador(new Date(combinarFechaHora(fecha, '12:00').getTime() + MS_DIA))
+
+// "dd/MM/yyyy HH:mm" en hora de Ecuador (para mensajes y notificaciones)
+const formatearFechaHora = (fecha) => {
+    const partes = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+        timeZone: ZONA_HORARIA, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date(fecha)).map(p => [p.type, p.value]))
+    return `${partes.day}/${partes.month}/${partes.year} ${partes.hour}:${partes.minute}`
+}
 
 // "AAAA-MM-DD" -> ese dia a la hora de fin del horario en Ecuador; con hora -> new Date(valor); invalida -> null
 const normalizarFechaDevolucion = (valor) => {
@@ -131,17 +183,20 @@ const calcularPenalizaciones = ({precio, fechaDevolucion, fechaDevolucionReal, c
 const textoTerminos = () => {
     const t = tarifas()
     const h = horario()
+    const maximo = maxSolicitudesActivas()
     return {
         version: TERMINOS_VERSION,
         tarifas: t,
         horario: h,
+        maxSolicitudesActivas: maximo,
         condiciones: [
             `Si el recurso se devuelve danado o incompleto, pagaras el ${t.danio} % de su precio.`,
             `Si pierdes el recurso, debes reponerlo completo o pagar el ${t.perdida} % de su precio.`,
             `Por cada dia o fraccion de atraso en la devolucion pagaras el ${t.atrasoPorDia} % del precio del recurso, hasta un maximo del ${t.tope} %.`,
             `La entrega y la devolucion solo se realizan entre las ${h.inicio} y las ${h.fin} (hora de Ecuador).`,
             'Si no devuelves el recurso, la asociacion contactara a tu docente de referencia.',
-            'Mientras tengas penalizaciones pendientes no podras solicitar nuevos recursos.'
+            'Mientras tengas penalizaciones pendientes no podras solicitar nuevos recursos.',
+            `Puedes tener como maximo ${maximo} solicitudes activas (pendientes, aprobadas o entregadas) al mismo tiempo.`
         ]
     }
 }
@@ -149,5 +204,7 @@ const textoTerminos = () => {
 export {
     ZONA_HORARIA, TOPE_PORCENTAJE, TERMINOS_VERSION, CONDICIONES, MS_DIA, DIAS_MAX_PRESTAMO,
     tarifas, horario, horarioActivo, minutosDelDia, dentroDeHorario, mensajeHorario,
-    normalizarFechaDevolucion, limiteMaximoDevolucion, calcularAtraso, calcularPenalizaciones, textoTerminos
+    normalizarFechaDevolucion, limiteMaximoDevolucion, calcularAtraso, calcularPenalizaciones, textoTerminos,
+    maxSolicitudesActivas, limitesMotivoRechazo, toleranciaEntregaMin, reservaMaxDiasAnticipacion, horasRecordatorio, intervaloRecordatorioMin,
+    fechaEcuador, esFechaISO, esHora, combinarFechaHora, diaSiguiente, formatearFechaHora
 }

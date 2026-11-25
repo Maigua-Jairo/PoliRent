@@ -5,7 +5,7 @@
 // Ante cualquier fallo (sin clave, error de red, cuota, tiempo agotado o JSON invalido) devuelve null
 // y el controlador usa la respuesta del motor local.
 import {PREGUNTAS_FRECUENTES, TIPOS_RESPUESTA} from './asistenteHelper.js'
-import {tarifas, horario, DIAS_MAX_PRESTAMO} from './politicasHelper.js'
+import {tarifas, horario, DIAS_MAX_PRESTAMO, maxSolicitudesActivas, horasRecordatorio} from './politicasHelper.js'
 
 const URL_API = 'https://generativelanguage.googleapis.com/v1beta/models'
 const MODELO_POR_DEFECTO = 'gemini-flash-lite-latest'
@@ -48,9 +48,11 @@ const reglasNegocio = () => {
     const t = tarifas()
     const h = horario()
     return [
-        `- Solo se puede tener un prestamo a la vez: con una solicitud pendiente, aprobada o un recurso entregado no se puede solicitar otro.`,
-        `- El prestamo dura como maximo ${DIAS_MAX_PRESTAMO} dias calendario; el estudiante elige la fecha de devolucion al reservar.`,
-        `- La entrega y la devolucion solo se hacen entre las ${h.inicio} y las ${h.fin} (hora de Ecuador).`,
+        `- Cada estudiante puede tener como maximo ${maxSolicitudesActivas()} solicitudes activas al mismo tiempo (pendientes, aprobadas o entregadas), sin importar para que dia sea cada una; al llegar al maximo debe cancelar una pendiente, esperar la respuesta o devolver un recurso.`,
+        `- Al reservar el estudiante elige la fecha y hora de entrega (por defecto hoy, desde ese momento; puede pedir para hoy) y la fecha y hora de devolucion (solo el dia: a las ${h.fin}). La devolucion debe ser posterior a la entrega (puede ser el mismo dia) y como maximo ${DIAS_MAX_PRESTAMO} dias calendario despues.`,
+        `- La entrega y la devolucion solo se hacen entre las ${h.inicio} y las ${h.fin} (hora de Ecuador); se valida la hora programada, no la hora en que se envia la solicitud. No se entrega antes de la hora programada.`,
+        '- El estudiante solo puede cancelar una solicitud pendiente (en revision); una aprobada ya no se cancela desde el sistema.',
+        `- PoliRent envia recordatorios automaticos ${horasRecordatorio().join(' y ')} hora(s) antes de la devolucion de cada recurso entregado.`,
         `- Penalizaciones (porcentaje del precio del recurso): ${t.atrasoPorDia} % por cada dia o fraccion de atraso, ${t.danio} % si se devuelve danado o incompleto, `
             + `${t.perdida} % si se pierde (sin sumar atraso); en total, como maximo el ${t.tope} % del precio por prestamo.`,
         '- Con penalizaciones pendientes o en revision no se puede solicitar otro recurso.',
@@ -79,7 +81,7 @@ const aContenidos = (historial, mensaje) => [
  * @param {string} datos.mensaje     mensaje del usuario
  * @param {Array}  datos.historial   [{rol: 'usuario'|'asistente', texto}] mensajes anteriores (ya validados)
  * @param {Array}  datos.recursos    recursos disponibles que Gemini puede recomendar
- * @param {string} datos.contextoUsuario  datos del usuario que ayudan a responder (p. ej. si tiene un prestamo activo)
+ * @param {string} datos.contextoUsuario  datos del usuario que ayudan a responder (p. ej. cuantas solicitudes activas tiene)
  * @returns {Promise<{tipo, respuesta, recursos: Array<id>, temas: Array<id>} | null>}
  */
 const consultarGemini = async ({mensaje, historial = [], recursos = [], contextoUsuario = ''}) => {

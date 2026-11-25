@@ -40,10 +40,11 @@ describe('Servidor', () => {
 describe('Validacion del registro', () => {
     const registrar = (cambios) => request(app).post('/api/registro').send({...registroValido, ...cambios})
 
+    // cada campo vacio responde con su nombre (antes: "Todos los campos son obligatorios")
     test('exige todos los campos', async () => {
         const res = await registrar({cedula: undefined})
         expect(res.status).toBe(400)
-        expect(res.body.msg).toBe('Todos los campos son obligatorios')
+        expect(res.body.msg).toBe('El campo cedula es obligatorio')
     })
 
     test('rechaza una cedula con digito verificador incorrecto', async () => {

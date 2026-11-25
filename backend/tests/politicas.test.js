@@ -163,8 +163,11 @@ describe('Terminos y condiciones', () => {
             'Si el recurso se devuelve danado o incompleto, pagaras el 20 % de su precio.',
             'Si pierdes el recurso, debes reponerlo completo o pagar el 100 % de su precio.',
             'La entrega y la devolucion solo se realizan entre las 07:00 y las 18:00 (hora de Ecuador).',
-            'Mientras tengas penalizaciones pendientes no podras solicitar nuevos recursos.'
+            'Mientras tengas penalizaciones pendientes no podras solicitar nuevos recursos.',
+            'Puedes tener como maximo 5 solicitudes activas (pendientes, aprobadas o entregadas) al mismo tiempo.'
         ]))
-        expect(t.condiciones).toHaveLength(6)
+        // 7 frases: se agrego la del maximo de solicitudes activas
+        expect(t.condiciones).toHaveLength(7)
+        expect(t.maxSolicitudesActivas).toBe(5)
     })
 })

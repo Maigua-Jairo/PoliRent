@@ -15,21 +15,35 @@ const datosComprobante = (c) => c?.url
     ? {url: c.url, subidoEn: c.subidoEn ?? null, referencia: c.referencia ?? '', observaciones: c.observaciones ?? ''}
     : null
 
+// prestamo poblado con nombres claros (como en datosPrestamo); si no esta poblado, el id
+const datosPrestamoPenalizacion = (pr) => pr && typeof pr === 'object' && 'estado' in pr
+    ? {
+        _id: pr._id,
+        estado: pr.estado,
+        fechaDevolucionProgramada: pr.fechaDevolucion,
+        fechaDevolucionReal: pr.fechaDevolucionReal,
+        ...(pr.docenteReferencia ? {docenteReferencia: pr.docenteReferencia} : {})
+    }
+    : pr
+
 const datosPenalizacion = (p) => ({
     _id: p._id,
     tipo: p.tipo,
     monto: p.monto,
-    dias: p.dias,
+    // dias de atraso (solo en el tipo atraso); en la base de datos sigue siendo dias
+    diasAtraso: p.dias ?? null,
     descripcion: p.descripcion,
     estado: p.estado,
-    fechaPago: p.fechaPago,
+    // fecha en que se registro la penalizacion (createdAt) y del pago (null si aun no esta pagada)
+    fechaRegistro: p.createdAt ?? null,
+    fechaPago: p.fechaPago ?? null,
     motivoAnulacion: p.motivoAnulacion,
     comprobante: datosComprobante(p.comprobante),
     motivoRechazoComprobante: p.motivoRechazoComprobante ?? '',
     fechaRevision: p.fechaRevision ?? null,
     usuario: p.usuario,
     recurso: p.recurso,
-    prestamo: p.prestamo,
+    prestamo: datosPrestamoPenalizacion(p.prestamo),
     createdAt: p.createdAt,
     updatedAt: p.updatedAt
 })
@@ -180,7 +194,7 @@ const rechazarComprobante = async (req, res) => {
         if(!penalizacion) return
         const anteriorId = penalizacion.comprobante?.publicId
         penalizacion.estado = 'pendiente'
-        penalizacion.motivoRechazoComprobante = req.body.motivo.trim()
+        penalizacion.motivoRechazoComprobante = req.body.motivoRechazoComprobante.trim()
         penalizacion.comprobante = undefined
         penalizacion.revisadaPor = req.usuarioHeader._id
         penalizacion.fechaRevision = new Date()
@@ -200,7 +214,7 @@ const anularPenalizacion = async (req, res) => {
         const penalizacion = await buscarEnEstado(req, res, ['pendiente', 'en_revision'], 'Solo se pueden anular penalizaciones pendientes o en revision')
         if(!penalizacion) return
         penalizacion.estado = 'anulada'
-        penalizacion.motivoAnulacion = req.body.motivo.trim()
+        penalizacion.motivoAnulacion = req.body.motivoAnulacion.trim()
         await penalizacion.save()
         await notificar(penalizacion.usuario, 'penalizacion', `Se anulo la penalizacion de ${formatoDolares(penalizacion.monto)} por "${nombreRecurso(penalizacion)}". Motivo: ${penalizacion.motivoAnulacion}`, penalizacion.prestamo)
         res.status(200).json({msg: 'Penalizacion anulada correctamente', penalizacion: datosPenalizacion(penalizacion)})

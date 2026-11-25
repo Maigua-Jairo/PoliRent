@@ -41,9 +41,10 @@ const UsuarioSchema = new Schema({
         required: true,
         trim: true
     },
+    // solo los estudiantes tienen facultad; el administrador (unico, asignado en la base de datos) no la tiene
     facultad:{
         type: String,
-        required: true,
+        required: function(){ return this.rol !== 'administrador' },
         enum: FACULTADES
     },
     password:{

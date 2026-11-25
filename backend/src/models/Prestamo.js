@@ -44,8 +44,16 @@ const PrestamoSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Usuario'
     },
+    // fecha y hora (Ecuador) en que el estudiante pidio recibir el recurso; las solicitudes antiguas no la tienen
+    fechaEntregaProgramada: Date,
+    // momento real de la entrega y de la devolucion
     fechaEntrega: Date,
     fechaDevolucionReal: Date,
+    // horas antes de la devolucion que ya se avisaron con un recordatorio (evita enviarlos dos veces)
+    recordatoriosEnviados:{
+        type: [Number],
+        default: undefined
+    },
     // version de los terminos y condiciones que el estudiante acepto al solicitar
     terminos:{
         version: String,
@@ -65,7 +73,7 @@ const PrestamoSchema = new Schema({
         condicion: {type: String, enum: CONDICIONES},
         evidencia: {url: String, publicId: String}
     },
-    // quien recibio el recurso, en que condicion volvio y la evidencia
+    // devolucion: responsableNombre es quien RECIBE el recurso de vuelta (no quien lo trae), en que condicion volvio y la evidencia
     devolucion:{
         responsable: {type: Schema.Types.ObjectId, ref: 'Usuario'},
         responsableNombre: String,
@@ -80,16 +88,12 @@ const PrestamoSchema = new Schema({
     optimisticConcurrency: true
 })
 
-// un estudiante solo puede tener un prestamo en uno de estos estados a la vez
+// solicitudes activas: cuentan para el maximo de MAX_SOLICITUDES_ACTIVAS (politicasHelper) por estudiante
 const ESTADOS_ACTIVOS = ['pendiente', 'aprobado', 'entregado']
 
-// mensaje para el estudiante que intenta solicitar otro recurso teniendo un prestamo activo
-const mensajePrestamoActivo = (estado, nombreRecurso) => {
-    const recurso = nombreRecurso ? ` (${nombreRecurso})` : ''
-    return estado === 'pendiente'
-        ? `Ya tienes una solicitud en revision${recurso}. Cancelala o espera la respuesta antes de solicitar otro recurso`
-        : `Ya tienes un prestamo en curso${recurso}. Devuelvelo antes de solicitar otro recurso`
-}
+// mensaje para el estudiante que ya llego al maximo de solicitudes activas
+const mensajeMaximoSolicitudes = (maximo) =>
+    `Alcanzaste el maximo de ${maximo} solicitudes activas; cancela una o espera la respuesta antes de solicitar otro recurso`
 
-export {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, CONDICIONES, mensajePrestamoActivo}
+export {ESTADOS_PRESTAMO, ESTADOS_ACTIVOS, CONDICIONES, mensajeMaximoSolicitudes}
 export default model('Prestamo', PrestamoSchema)

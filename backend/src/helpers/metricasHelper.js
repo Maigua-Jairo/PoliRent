@@ -94,4 +94,51 @@ const resumenPenalizaciones = (penalizaciones) => {
     }
 }
 
-export {ocupacion, recursosParaReponer, resumenPenalizaciones, UMBRAL_ALTA_DEMANDA, DIAS_OCUPACION}
+// porcentajes con 1 decimal que suman exactamente 100 (metodo del mayor residuo)
+const porcentajes = (montos) => {
+    const total = montos.reduce((s, m) => s + m, 0)
+    if(total <= 0) return montos.map(() => 0)
+    const decimas = montos.map(m => m / total * 1000)
+    const base = decimas.map(Math.floor)
+    let faltan = 1000 - base.reduce((s, d) => s + d, 0)
+    const orden = decimas.map((d, i) => [d - base[i], i]).sort((a, b) => b[0] - a[0])
+    for(const [, i] of orden){
+        if(faltan <= 0) break
+        base[i] += 1
+        faltan -= 1
+    }
+    return base.map(d => d / 10)
+}
+
+// agrupa las pagadas por `clave`, ordena de mayor a menor monto y agrega el porcentaje del total recaudado
+const agruparRecaudo = (pagadas, clave, describir) => {
+    const grupos = new Map()
+    for(const p of pagadas){
+        const k = clave(p)
+        const g = grupos.get(k) ?? {cantidad: 0, monto: 0}
+        g.cantidad += 1
+        g.monto = redondear2(g.monto + (Number(p.monto) || 0))
+        grupos.set(k, g)
+    }
+    const lista = [...grupos.entries()]
+        .map(([k, g]) => ({...describir(k), cantidad: g.cantidad, monto: g.monto}))
+        .sort((a, b) => b.monto - a.monto || b.cantidad - a.cantidad)
+    const pct = porcentajes(lista.map(g => g.monto))
+    return lista.map((g, i) => ({...g, porcentaje: pct[i]}))
+}
+
+// dinero recaudado (solo penalizaciones pagadas) en total, por recurso y por tipo.
+// `recursos`: Map id -> {nombre}. Ej.: de $100 recaudados, $25 (25 %) fueron por el balon de voley
+const recaudado = (penalizaciones, recursos = new Map()) => {
+    const pagadas = penalizaciones.filter(p => p.estado === 'pagada')
+    return {
+        total: redondear2(pagadas.reduce((s, p) => s + (Number(p.monto) || 0), 0)),
+        porRecurso: agruparRecaudo(pagadas, p => String(p.recurso?._id ?? p.recurso ?? ''), (id) => ({
+            recurso: id || null,
+            nombre: recursos.get(id)?.nombre ?? 'Recurso eliminado'
+        })),
+        porTipo: agruparRecaudo(pagadas, p => p.tipo, (tipo) => ({tipo}))
+    }
+}
+
+export {ocupacion, recursosParaReponer, resumenPenalizaciones, recaudado, porcentajes, UMBRAL_ALTA_DEMANDA, DIAS_OCUPACION}
